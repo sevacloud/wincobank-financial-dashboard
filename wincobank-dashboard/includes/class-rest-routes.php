@@ -58,6 +58,41 @@ class Wincobank_REST_Routes {
             ],
         ] );
 
+        // Prior-year figures — per nominal code, admin-editable.
+        register_rest_route( self::NAMESPACE, '/prior-year', [
+            [
+                'methods'             => 'GET',
+                'callback'            => [ $this, 'get_prior_year' ],
+                'permission_callback' => $auth,
+                'args'                => [
+                    'fy' => [
+                        'required'          => true,
+                        'validate_callback' => fn( $v ) => is_numeric( $v ) && (int) $v >= 2000,
+                        'sanitize_callback' => 'absint',
+                    ],
+                ],
+            ],
+            [
+                'methods'             => 'POST',
+                'callback'            => [ $this, 'save_prior_year_figure' ],
+                'permission_callback' => fn() => current_user_can( 'manage_options' ),
+                'args'                => [
+                    'fy'     => [
+                        'required'          => true,
+                        'sanitize_callback' => 'absint',
+                    ],
+                    'code'   => [
+                        'required'          => true,
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ],
+                    'amount' => [
+                        'required'          => true,
+                        'sanitize_callback' => fn( $v ) => round( (float) $v, 2 ),
+                    ],
+                ],
+            ],
+        ] );
+
         // Project budgets — stored in wp_options, editable by trustees.
         register_rest_route( self::NAMESPACE, '/project-budgets', [
             [
@@ -143,8 +178,28 @@ class Wincobank_REST_Routes {
     public function get_annual_statement( WP_REST_Request $req ): WP_REST_Response|WP_Error {
         [ $from, $to ] = $this->extract_dates( $req );
         $api            = new Wincobank_QuickFile_API();
-        $data           = $api->get_chart_of_accounts( $from, $to );
-        return is_wp_error( $data ) ? $data : new WP_REST_Response( $data );
+
+        // Combined (authoritative for nominal codes and names).
+        $combined = $api->get_chart_of_accounts( $from, $to );
+        if ( is_wp_error( $combined ) ) {
+            return $combined;
+        }
+
+        // Per-account (BankAccountID filter — gracefully empty if unsupported).
+        $account_ids = [
+            'trust'   => (int) get_option( 'wincobank_account_trust',   1347970 ),
+            'chapel'  => (int) get_option( 'wincobank_account_chapel',  1347971 ),
+            'natwest' => (int) get_option( 'wincobank_account_natwest', 1347978 ),
+        ];
+        $result = [ 'combined' => $combined ];
+        foreach ( $account_ids as $label => $id ) {
+            $data = $api->get_chart_of_accounts( $from, $to, $id );
+            $result[ $label ] = is_wp_error( $data )
+                ? [ '_error' => $data->get_error_message() ]
+                : $data;
+        }
+
+        return new WP_REST_Response( $result );
     }
 
     public function get_projects( WP_REST_Request $req ): WP_REST_Response|WP_Error {
@@ -213,6 +268,27 @@ class Wincobank_REST_Routes {
         }
 
         return new WP_REST_Response( $result );
+    }
+
+    public function get_prior_year( WP_REST_Request $req ): WP_REST_Response {
+        $fy  = $req->get_param( 'fy' );
+        $raw = (string) get_option( "wincobank_prior_year_{$fy}", '{}' );
+        $data = json_decode( $raw, true );
+        return new WP_REST_Response( is_array( $data ) ? $data : [] );
+    }
+
+    public function save_prior_year_figure( WP_REST_Request $req ): WP_REST_Response {
+        $fy     = $req->get_param( 'fy' );
+        $code   = $req->get_param( 'code' );
+        $amount = $req->get_param( 'amount' );
+        $key    = "wincobank_prior_year_{$fy}";
+        $stored = json_decode( (string) get_option( $key, '{}' ), true );
+        if ( ! is_array( $stored ) ) {
+            $stored = [];
+        }
+        $stored[ $code ] = $amount;
+        update_option( $key, wp_json_encode( $stored ), false );
+        return new WP_REST_Response( [ 'saved' => true, 'fy' => $fy, 'code' => $code, 'amount' => $amount ] );
     }
 
     public function get_project_budgets(): WP_REST_Response {

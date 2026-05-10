@@ -36,7 +36,8 @@ export const api = {
     getProjects:        ( from, to )   => apiFetch( '/projects', { from, to } ),
     getUtilities:       ( from, to )   => apiFetch( '/utilities', { from, to } ),
     getYearComparison:  ( years )      => apiFetch( '/year-comparison', { years: years.join( ',' ) } ),
-    getProjectBudgets:  ()             => apiFetch( '/project-budgets' ),
-    saveProjectBudget:  ( tag_id, budget ) =>
-        apiFetch( '/project-budgets', {}, 'POST', { tag_id, budget } ),
+    getProjectBudgets:    ()                        => apiFetch( '/project-budgets' ),
+    saveProjectBudget:    ( tag_id, budget )        => apiFetch( '/project-budgets', {}, 'POST', { tag_id, budget } ),
+    getPriorYear:         ( fy )                    => apiFetch( '/prior-year', { fy } ),
+    savePriorYearFigure:  ( fy, code, amount )      => apiFetch( '/prior-year', {}, 'POST', { fy, code, amount } ),
 };

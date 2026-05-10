@@ -153,23 +153,25 @@ class Wincobank_QuickFile_API {
      * @param  string $to    End date (YYYY-MM-DD).
      * @return array|WP_Error
      */
-    public function get_chart_of_accounts( string $from, string $to ): array|WP_Error {
+    public function get_chart_of_accounts( string $from, string $to, int $bank_id = 0 ): array|WP_Error {
         $guard = $this->credentials_guard();
         if ( is_wp_error( $guard ) ) {
             return $guard;
         }
 
-        $cache_key = self::CACHE_PREFIX . 'coa_' . md5( "{$from}|{$to}" );
+        $cache_key = self::CACHE_PREFIX . 'coa_' . md5( "{$from}|{$to}|{$bank_id}" );
         $cached    = get_transient( $cache_key );
         if ( $cached !== false ) {
             return $cached;
         }
 
+        $params = [ 'FromDate' => $from, 'ToDate' => $to ];
+        if ( $bank_id > 0 ) {
+            $params['BankAccountID'] = (string) $bank_id;
+        }
+
         $payload = $this->build_payload( 'Report', 'ChartOfAccounts', [
-            'Parameters' => [
-                'FromDate' => $from,
-                'ToDate'   => $to,
-            ],
+            'Parameters' => $params,
         ] );
 
         $raw = $this->post( 'report', $payload );

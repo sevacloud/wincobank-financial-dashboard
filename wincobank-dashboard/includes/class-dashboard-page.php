@@ -71,11 +71,12 @@ class Wincobank_Dashboard_Page {
         );
 
         wp_localize_script( 'wincobank-dashboard', 'wincobankData', [
-            'restUrl'    => esc_url_raw( rest_url( 'wincobank/v1' ) ),
-            'nonce'      => wp_create_nonce( 'wp_rest' ),
+            'restUrl'     => esc_url_raw( rest_url( 'wincobank/v1' ) ),
+            'nonce'       => wp_create_nonce( 'wp_rest' ),
             'currentYear' => (int) date( 'Y' ),
-            'fyStart'    => $this->current_fy_start(),
-            'fyEnd'      => $this->current_fy_end(),
+            'fyStart'     => $this->current_fy_start(),
+            'fyEnd'       => $this->current_fy_end(),
+            'isAdmin'     => current_user_can( 'manage_options' ),
         ] );
     }
 
