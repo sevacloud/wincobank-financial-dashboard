@@ -11,6 +11,7 @@ class Wincobank_Admin_Settings {
         add_action( 'admin_init', [ $this, 'register_settings' ] );
         add_action( 'admin_post_wincobank_flush_cache', [ $this, 'handle_flush_cache' ] );
         add_action( 'wp_ajax_wincobank_test_connection', [ $this, 'handle_test_connection' ] );
+        add_action( 'admin_post_wincobank_clear_log',   [ $this, 'handle_clear_log' ] );
     }
 
     public function add_menu_page(): void {
@@ -109,6 +110,15 @@ class Wincobank_Admin_Settings {
 
         $api  = new Wincobank_QuickFile_API();
         wp_send_json_success( $api->diagnostic_request() );
+    }
+
+    public function handle_clear_log(): void {
+        check_admin_referer( 'wincobank_clear_log' );
+        if ( current_user_can( 'manage_options' ) ) {
+            Wincobank_QuickFile_API::clear_log();
+        }
+        wp_redirect( add_query_arg( [ 'page' => self::PAGE_SLUG ], admin_url( 'options-general.php' ) ) );
+        exit;
     }
 
     public function handle_flush_cache(): void {
@@ -227,6 +237,58 @@ class Wincobank_Admin_Settings {
                 );
                 ?>
             </p>
+            <hr>
+            <h2>
+                <label>
+                    <input type="checkbox" id="wb-log-toggle" style="margin-right:6px;">
+                    <?php esc_html_e( 'API Debug Log', 'wincobank-dashboard' ); ?>
+                </label>
+            </h2>
+            <div id="wb-log-wrap" style="display:none;">
+                <?php
+                $log = Wincobank_QuickFile_API::get_log();
+                if ( empty( $log ) ) :
+                ?>
+                    <p><em><?php esc_html_e( 'No log entries yet. Use Test Connection or load the dashboard to generate entries.', 'wincobank-dashboard' ); ?></em></p>
+                <?php else : ?>
+                    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-bottom:12px;">
+                        <?php wp_nonce_field( 'wincobank_clear_log' ); ?>
+                        <input type="hidden" name="action" value="wincobank_clear_log">
+                        <?php submit_button( __( 'Clear Log', 'wincobank-dashboard' ), 'secondary small', 'submit', false ); ?>
+                    </form>
+                    <table class="widefat striped" style="font-family:monospace;font-size:12px;">
+                        <thead>
+                            <tr>
+                                <th><?php esc_html_e( 'Time', 'wincobank-dashboard' ); ?></th>
+                                <th><?php esc_html_e( 'Method', 'wincobank-dashboard' ); ?></th>
+                                <th><?php esc_html_e( 'URL', 'wincobank-dashboard' ); ?></th>
+                                <th><?php esc_html_e( 'HTTP', 'wincobank-dashboard' ); ?></th>
+                                <th><?php esc_html_e( 'Response', 'wincobank-dashboard' ); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( array_reverse( $log ) as $entry ) : ?>
+                            <tr>
+                                <td style="white-space:nowrap;"><?php echo esc_html( $entry['time'] ?? '' ); ?></td>
+                                <td style="white-space:nowrap;"><?php echo esc_html( $entry['method'] ?? '' ); ?></td>
+                                <td style="word-break:break-all;"><?php echo esc_html( $entry['url'] ?? '' ); ?></td>
+                                <td style="font-weight:bold;color:<?php echo ( ( $entry['http_code'] ?? 0 ) === 200 ) ? 'green' : 'red'; ?>">
+                                    <?php echo esc_html( $entry['http_code'] ?? '' ); ?>
+                                </td>
+                                <td style="max-width:400px;overflow:hidden;word-break:break-all;">
+                                    <?php echo esc_html( $entry['response'] ?? '' ); ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+            <script>
+            document.getElementById('wb-log-toggle').addEventListener('change', function() {
+                document.getElementById('wb-log-wrap').style.display = this.checked ? 'block' : 'none';
+            });
+            </script>
         </div>
         <?php
     }

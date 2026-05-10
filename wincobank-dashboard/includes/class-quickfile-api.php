@@ -346,7 +346,8 @@ class Wincobank_QuickFile_API {
     private function post( string $module, array $payload ): array|WP_Error {
         $base        = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
         $method_name = (string) array_key_first( $payload ); // e.g. "Bank_GetAccountBalances"
-        $url         = $base . $method_name;
+        // Try both URL formats: module_action (docs) and module/action (ASP.NET MVC routing).
+        $url = $base . str_replace( '_', '/', $method_name );
         $args = [
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -362,34 +363,26 @@ class Wincobank_QuickFile_API {
         do {
             $response = wp_remote_post( $url, $args );
             $attempts++;
-
-            // Retry only on transport/network errors, not HTTP-level errors.
             $retry = is_wp_error( $response ) && $attempts <= self::MAX_RETRIES;
         } while ( $retry );
+
+        $http_code    = is_wp_error( $response ) ? 0 : wp_remote_retrieve_response_code( $response );
+        $raw_body     = is_wp_error( $response ) ? $response->get_error_message() : wp_remote_retrieve_body( $response );
+        $decoded_body = json_decode( $raw_body, true );
+
+        $this->append_log( $method_name, $url, $http_code, $raw_body );
 
         if ( is_wp_error( $response ) ) {
             return new WP_Error(
                 'quickfile_network_error',
-                sprintf(
-                    'Network error communicating with QuickFile (%s): %s',
-                    $module,
-                    $response->get_error_message()
-                )
+                sprintf( 'Network error (%s): %s', $module, $response->get_error_message() )
             );
         }
 
-        $http_code    = wp_remote_retrieve_response_code( $response );
-        $raw_body     = wp_remote_retrieve_body( $response );
-        $decoded_body = json_decode( $raw_body, true );
-
         if ( $http_code !== 200 ) {
-            // Include whatever QuickFile sent back so the error is actionable.
-            $detail = '';
-            if ( is_array( $decoded_body ) ) {
-                $detail = ' — ' . wp_json_encode( $decoded_body );
-            } elseif ( $raw_body !== '' ) {
-                $detail = ' — ' . substr( $raw_body, 0, 300 );
-            }
+            $detail = is_array( $decoded_body )
+                ? ' — ' . wp_json_encode( $decoded_body )
+                : ( $raw_body !== '' ? ' — ' . substr( $raw_body, 0, 300 ) : '' );
             return new WP_Error(
                 'quickfile_http_error',
                 sprintf( 'QuickFile HTTP %d (%s)%s', $http_code, strtoupper( $module ), $detail )
@@ -449,46 +442,64 @@ class Wincobank_QuickFile_API {
     // Diagnostics
     // =========================================================================
 
-    /**
-     * Make a single Bank_GetAccountBalances call for the first configured
-     * account and return the full request/response details for display in
-     * the admin Test Connection output. The API key is masked in the output.
-     */
     public function diagnostic_request(): array {
         $account_ids = $this->account_ids();
         $first_id    = reset( $account_ids );
 
-        $submission = $this->auth->make_submission_number();
-        $payload    = $this->build_payload( 'Bank', 'GetAccountBalances', [
+        $payload     = $this->build_payload( 'Bank', 'GetAccountBalances', [
             'Bank' => [ 'BankAccountID' => (string) $first_id ],
         ] );
 
         $base        = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
         $method_name = (string) array_key_first( $payload );
-        $url         = $base . $method_name;
+        $url         = $base . str_replace( '_', '/', $method_name );
 
-        // Mask the MD5 value in the output so credentials aren't exposed.
         $safe_payload = $payload;
         if ( isset( $safe_payload[ $method_name ]['Header']['MD5Value'] ) ) {
             $safe_payload[ $method_name ]['Header']['MD5Value'] = '*** masked ***';
         }
 
-        $args = [
+        $args     = [
             'headers' => [ 'Content-Type' => 'application/json', 'Accept' => 'application/json' ],
             'body'    => wp_json_encode( $payload ),
             'timeout' => self::HTTP_TIMEOUT,
         ];
-
         $response  = wp_remote_post( $url, $args );
         $http_code = is_wp_error( $response ) ? 0 : wp_remote_retrieve_response_code( $response );
         $raw_body  = is_wp_error( $response ) ? $response->get_error_message() : wp_remote_retrieve_body( $response );
 
+        $this->append_log( $method_name, $url, $http_code, $raw_body );
+
         return [
-            'url'            => $url,
-            'request_body'   => $safe_payload,
-            'http_code'      => $http_code,
-            'response_body'  => substr( $raw_body, 0, 1000 ),
+            'url'           => $url,
+            'request_body'  => $safe_payload,
+            'http_code'     => $http_code,
+            'response_body' => substr( $raw_body, 0, 1000 ),
         ];
+    }
+
+    public static function get_log(): array {
+        return (array) json_decode( (string) get_option( 'wincobank_api_log', '[]' ), true );
+    }
+
+    public static function clear_log(): void {
+        delete_option( 'wincobank_api_log' );
+    }
+
+    private function append_log( string $method, string $url, int $http_code, string $raw_body ): void {
+        $log   = self::get_log();
+        $log[] = [
+            'time'      => current_time( 'Y-m-d H:i:s' ),
+            'method'    => $method,
+            'url'       => $url,
+            'http_code' => $http_code,
+            'response'  => substr( $raw_body, 0, 500 ),
+        ];
+        // Keep last 30 entries.
+        if ( count( $log ) > 30 ) {
+            $log = array_slice( $log, -30 );
+        }
+        update_option( 'wincobank_api_log', wp_json_encode( $log ), false );
     }
 
     // =========================================================================
