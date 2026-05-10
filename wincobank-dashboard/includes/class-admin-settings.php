@@ -93,9 +93,13 @@ class Wincobank_Admin_Settings {
             wp_die( __( 'Unauthorised', 'wincobank-dashboard' ) );
         }
         global $wpdb;
-        $wpdb->query(
-            "DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_wincobank_%' OR option_name LIKE '_transient_timeout_wincobank_%'"
-        );
+        $prefix  = $wpdb->esc_like( '_transient_' . Wincobank_QuickFile_API::CACHE_PREFIX ) . '%';
+        $timeout = $wpdb->esc_like( '_transient_timeout_' . Wincobank_QuickFile_API::CACHE_PREFIX ) . '%';
+        $wpdb->query( $wpdb->prepare(
+            "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+            $prefix,
+            $timeout
+        ) );
         wp_redirect( add_query_arg( [ 'page' => self::PAGE_SLUG, 'cache_flushed' => '1' ], admin_url( 'options-general.php' ) ) );
         exit;
     }

@@ -71,21 +71,42 @@ class Wincobank_REST_Routes {
     // -----------------------------------------------------------------
 
     public function get_balances(): WP_REST_Response|WP_Error {
-        $api  = new Wincobank_QuickFile_API();
-        $data = $api->get_account_balances();
-        return is_wp_error( $data ) ? $data : new WP_REST_Response( $data );
+        $api     = new Wincobank_QuickFile_API();
+        $results = $api->get_account_balances();
+
+        if ( is_wp_error( $results ) ) {
+            return $results;
+        }
+
+        // Unwrap per-account envelopes: merge balance data to top level so the
+        // React client can read fields (e.g. CurrentBalance) directly.
+        // Accounts that errored carry a _error field instead.
+        $response = [];
+        foreach ( $results as $label => $envelope ) {
+            $response[ $label ] = $envelope['error'] !== null
+                ? [ '_error' => $envelope['error'] ]
+                : array_merge( (array) $envelope['data'], [ '_cached' => $envelope['cached'] ] );
+        }
+
+        return new WP_REST_Response( $response );
     }
 
     public function get_monthly_summary( WP_REST_Request $req ): WP_REST_Response|WP_Error {
         [ $from, $to ] = $this->extract_dates( $req );
         $api            = new Wincobank_QuickFile_API();
-        $account_ids    = $this->get_account_ids();
+        $account_ids    = [
+            'trust'   => (int) get_option( 'wincobank_account_trust',   1347970 ),
+            'chapel'  => (int) get_option( 'wincobank_account_chapel',  1347971 ),
+            'natwest' => (int) get_option( 'wincobank_account_natwest', 1347978 ),
+        ];
         $result         = [];
 
         foreach ( $account_ids as $label => $id ) {
             $txns = $api->search_transactions( $id, $from, $to );
             if ( is_wp_error( $txns ) ) {
-                return $txns;
+                // Surface the error per account; don't abort the whole response.
+                $result[ $label ] = [ '_error' => $txns->get_error_message() ];
+                continue;
             }
             $result[ $label ] = $this->aggregate_monthly( $txns );
         }
@@ -170,9 +191,13 @@ class Wincobank_REST_Routes {
 
     public function flush_cache(): WP_REST_Response {
         global $wpdb;
-        $wpdb->query(
-            "DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_wincobank_%' OR option_name LIKE '_transient_timeout_wincobank_%'"
-        );
+        $prefix  = $wpdb->esc_like( '_transient_' . Wincobank_QuickFile_API::CACHE_PREFIX ) . '%';
+        $timeout = $wpdb->esc_like( '_transient_timeout_' . Wincobank_QuickFile_API::CACHE_PREFIX ) . '%';
+        $wpdb->query( $wpdb->prepare(
+            "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+            $prefix,
+            $timeout
+        ) );
         return new WP_REST_Response( [ 'flushed' => true ] );
     }
 
@@ -200,14 +225,6 @@ class Wincobank_REST_Routes {
         return [
             sanitize_text_field( $req->get_param( 'from' ) ),
             sanitize_text_field( $req->get_param( 'to' ) ),
-        ];
-    }
-
-    private function get_account_ids(): array {
-        return [
-            'trust'   => (int) get_option( 'wincobank_account_trust', 1347970 ),
-            'chapel'  => (int) get_option( 'wincobank_account_chapel', 1347971 ),
-            'natwest' => (int) get_option( 'wincobank_account_natwest', 1347978 ),
         ];
     }
 
