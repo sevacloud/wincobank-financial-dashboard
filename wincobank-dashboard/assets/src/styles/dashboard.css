@@ -50,11 +50,6 @@ body.wincobank-dashboard-body {
     overflow-y: auto;
 }
 
-.wb-sidebar__logo {
-    padding: 24px 20px 16px;
-    border-bottom: 1px solid rgba(255,255,255,.15);
-}
-
 .wb-sidebar__logo h1 {
     font-size: 1rem;
     font-weight: 700;
@@ -275,11 +270,106 @@ body.wincobank-dashboard-body {
 /* ----- Combined total column ----- */
 .wb-col-combined { background: #f0f4fb; font-weight: 600; }
 
+/* ----- Burger button (hidden on desktop) ----- */
+.wb-burger {
+    display: none;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 24px;
+    height: 18px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.wb-burger span {
+    display: block;
+    height: 2px;
+    background: var(--navy);
+    border-radius: 2px;
+    transition: opacity .15s;
+}
+
+.wb-burger:hover span { opacity: .7; }
+
+.wb-topbar__left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+/* ----- Sidebar close button (hidden on desktop) ----- */
+.wb-sidebar__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 24px 20px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.15);
+}
+
+.wb-sidebar__logo { padding: 0; border-bottom: none; }
+
+.wb-sidebar__close {
+    display: none;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,.7);
+    font-size: 1.125rem;
+    cursor: pointer;
+    padding: 2px 4px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.wb-sidebar__close:hover { color: var(--white); }
+
+/* ----- Backdrop (mobile only) ----- */
+.wb-nav-backdrop {
+    display: none;
+}
+
 /* ----- Responsive ----- */
 @media (max-width: 768px) {
     .wb-layout { flex-direction: column; }
-    .wb-sidebar { width: 100%; height: auto; position: static; }
+
+    /* Sidebar slides in from the left as a drawer */
+    .wb-sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 280px;
+        height: 100%;
+        z-index: 1000;
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+        box-shadow: 4px 0 24px rgba(0,0,0,.25);
+    }
+
+    .wb-sidebar--open {
+        transform: translateX(0);
+    }
+
+    .wb-sidebar__close { display: block; }
+
+    /* Semi-transparent backdrop behind the open drawer */
+    .wb-nav-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.45);
+        z-index: 999;
+        animation: wb-fade-in .2s ease;
+    }
+
+    @keyframes wb-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Show burger button */
+    .wb-burger { display: flex; }
+
     .wb-content { padding: 16px; }
     .wb-topbar { padding: 12px 16px; }
+    .wb-topbar__meta { display: none; }
     .wb-balances { grid-template-columns: 1fr; }
 }

@@ -31,7 +31,8 @@ function ViewContent( { view } ) {
 }
 
 export default function App() {
-    const [ view, setView ] = useState( 'dashboard' );
+    const [ view, setView ]       = useState( 'dashboard' );
+    const [ menuOpen, setMenuOpen ] = useState( false );
 
     const now = new Date().toLocaleDateString( 'en-GB', {
         day: '2-digit', month: 'long', year: 'numeric',
@@ -39,10 +40,26 @@ export default function App() {
 
     return (
         <div className="wb-layout">
-            <Nav activeView={ view } onNavigate={ setView } />
+            <Nav
+                activeView={ view }
+                onNavigate={ setView }
+                isOpen={ menuOpen }
+                onClose={ () => setMenuOpen( false ) }
+            />
             <main className="wb-main" id="main-content" tabIndex="-1">
                 <header className="wb-topbar">
-                    <span className="wb-topbar__title">{ VIEW_TITLES[ view ] }</span>
+                    <div className="wb-topbar__left">
+                        <button
+                            className="wb-burger"
+                            onClick={ () => setMenuOpen( true ) }
+                            aria-label={ __( 'Open menu', 'wincobank-dashboard' ) }
+                            aria-expanded={ menuOpen }
+                            aria-controls="wb-sidebar"
+                        >
+                            <span /><span /><span />
+                        </button>
+                        <span className="wb-topbar__title">{ VIEW_TITLES[ view ] }</span>
+                    </div>
                     <span className="wb-topbar__meta">
                         { __( 'The Charity of Mary Ann Rawson for Wincobank School', 'wincobank-dashboard' ) }
                         { ' · ' }{ now }
