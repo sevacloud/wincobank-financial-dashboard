@@ -1,4 +1,4 @@
-name: Deploy to WordPress
+name: Deploy WordPress plugin via SFTP (IONOS)
 
 on:
   push:
@@ -9,12 +9,13 @@ on:
 
 jobs:
   deploy:
-    name: Build & deploy plugin
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # ── Build ────────────────────────────────────────────────────────────────
 
@@ -35,21 +36,20 @@ jobs:
 
       # ── Deploy ───────────────────────────────────────────────────────────────
 
-      - name: Deploy via SFTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - name: Deploy via SFTP (lftp mirror)
+        uses: pressidium/lftp-mirror-action@v1
         with:
-          protocol: sftp
-          server: ${{ secrets.SFTP_HOST }}
+          host: ${{ secrets.SFTP_HOST }}
           port: ${{ secrets.SFTP_PORT }}
-          username: ${{ secrets.SFTP_USER }}
-          password: ${{ secrets.SFTP_PASS }}
-          local-dir: ./wincobank-dashboard/
-          server-dir: ${{ secrets.DEPLOY_PATH }}/wincobank-dashboard/
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            assets/src/**
-            package.json
-            package-lock.json
-            .gitignore
+          user: ${{ secrets.SFTP_USER }}
+          pass: ${{ secrets.SFTP_PASS }}
+          localDir: ./wincobank-dashboard/
+          remoteDir: ${{ secrets.DEPLOY_PATH }}/wincobank-dashboard/
+          restoreMTime: true
+          parallel: 3
+          options: >-
+            --exclude ^node_modules/
+            --exclude ^assets/src/
+            --exclude-glob package.json
+            --exclude-glob package-lock.json
+            --exclude-glob .gitignore
