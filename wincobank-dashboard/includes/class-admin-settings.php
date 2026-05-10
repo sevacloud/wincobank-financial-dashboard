@@ -83,8 +83,8 @@ class Wincobank_Admin_Settings {
         );
     }
 
-    public function sanitize_api_key( string $value ): string {
-        $trimmed = trim( $value );
+    public function sanitize_api_key( $value ): string {
+        $trimmed = trim( (string) $value );
         if ( $trimmed === '' ) {
             // Keep existing encrypted key.
             return (string) get_option( 'wincobank_qf_api_key_enc', '' );

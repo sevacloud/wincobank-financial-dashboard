@@ -9,9 +9,9 @@ defined( 'ABSPATH' ) || exit;
  */
 class Wincobank_QuickFile_Auth {
 
-    private string $account_number;
-    private string $api_key;
-    private string $application_id;
+    private string $account_number  = '';
+    private string $api_key         = '';
+    private string $application_id  = '';
 
     public function __construct() {
         $this->account_number = (string) get_option( 'wincobank_qf_account_number', '' );
