@@ -58,6 +58,32 @@ class Wincobank_REST_Routes {
             ],
         ] );
 
+        // Project budgets — stored in wp_options, editable by trustees.
+        register_rest_route( self::NAMESPACE, '/project-budgets', [
+            [
+                'methods'             => 'GET',
+                'callback'            => [ $this, 'get_project_budgets' ],
+                'permission_callback' => $auth,
+            ],
+            [
+                'methods'             => 'POST',
+                'callback'            => [ $this, 'save_project_budget' ],
+                'permission_callback' => $auth,
+                'args'                => [
+                    'tag_id' => [
+                        'required'          => true,
+                        'validate_callback' => fn( $v ) => is_numeric( $v ) && (int) $v > 0,
+                        'sanitize_callback' => 'absint',
+                    ],
+                    'budget' => [
+                        'required'          => true,
+                        'validate_callback' => fn( $v ) => is_numeric( $v ) && (float) $v >= 0,
+                        'sanitize_callback' => fn( $v ) => round( (float) $v, 2 ),
+                    ],
+                ],
+            ],
+        ] );
+
         // Cache-bust endpoint (admin only).
         register_rest_route( self::NAMESPACE, '/flush-cache', [
             'methods'             => 'POST',
@@ -187,6 +213,30 @@ class Wincobank_REST_Routes {
         }
 
         return new WP_REST_Response( $result );
+    }
+
+    public function get_project_budgets(): WP_REST_Response {
+        global $wpdb;
+        $like = $wpdb->esc_like( 'wincobank_budget_' ) . '%';
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
+                $like
+            )
+        );
+        $budgets = [];
+        foreach ( $rows as $row ) {
+            $tag_id             = substr( $row->option_name, strlen( 'wincobank_budget_' ) );
+            $budgets[ $tag_id ] = (float) $row->option_value;
+        }
+        return new WP_REST_Response( $budgets );
+    }
+
+    public function save_project_budget( WP_REST_Request $req ): WP_REST_Response {
+        $tag_id = $req->get_param( 'tag_id' );
+        $budget = $req->get_param( 'budget' );
+        update_option( "wincobank_budget_{$tag_id}", $budget, false );
+        return new WP_REST_Response( [ 'saved' => true, 'tag_id' => $tag_id, 'budget' => $budget ] );
     }
 
     public function flush_cache(): WP_REST_Response {
