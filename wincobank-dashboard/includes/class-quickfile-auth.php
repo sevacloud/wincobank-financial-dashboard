@@ -11,11 +11,12 @@ class Wincobank_QuickFile_Auth {
 
     private string $account_number;
     private string $api_key;
-    private string $application_id = 'WincobankDashboard';
+    private string $application_id;
 
     public function __construct() {
         $this->account_number = (string) get_option( 'wincobank_qf_account_number', '' );
         $this->api_key        = (string) $this->get_decrypted_api_key();
+        $this->application_id = (string) get_option( 'wincobank_qf_application_id', '' );
     }
 
     /**
@@ -39,7 +40,7 @@ class Wincobank_QuickFile_Auth {
     }
 
     public function is_configured(): bool {
-        return $this->account_number !== '' && $this->api_key !== '';
+        return $this->account_number !== '' && $this->api_key !== '' && $this->application_id !== '';
     }
 
     // -----------------------------------------------------------------

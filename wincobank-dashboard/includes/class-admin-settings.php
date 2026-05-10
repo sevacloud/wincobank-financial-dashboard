@@ -25,6 +25,7 @@ class Wincobank_Admin_Settings {
     public function register_settings(): void {
         $options = [
             'wincobank_qf_account_number' => 'sanitize_text_field',
+            'wincobank_qf_application_id' => 'sanitize_text_field',
             'wincobank_cache_duration'    => 'absint',
             'wincobank_account_trust'     => 'absint',
             'wincobank_account_chapel'    => 'absint',
@@ -45,6 +46,7 @@ class Wincobank_Admin_Settings {
         add_settings_section( 'wincobank_cache', __( 'Cache Settings', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
 
         $this->add_field( 'wincobank_api', 'wincobank_qf_account_number', __( 'QuickFile Account Number', 'wincobank-dashboard' ), 'text' );
+        $this->add_field( 'wincobank_api', 'wincobank_qf_application_id', __( 'Application ID', 'wincobank-dashboard' ), 'text', __( 'The Application ID from QuickFile Settings → API Management.', 'wincobank-dashboard' ) );
         $this->add_field( 'wincobank_api', 'wincobank_qf_api_key', __( 'API Key', 'wincobank-dashboard' ), 'password', __( 'Leave blank to keep current key.', 'wincobank-dashboard' ) );
 
         $this->add_field( 'wincobank_accounts', 'wincobank_account_trust', __( 'Trust Account ID (HSBC)', 'wincobank-dashboard' ), 'number' );
