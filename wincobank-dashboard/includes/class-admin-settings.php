@@ -10,6 +10,7 @@ class Wincobank_Admin_Settings {
         add_action( 'admin_menu', [ $this, 'add_menu_page' ] );
         add_action( 'admin_init', [ $this, 'register_settings' ] );
         add_action( 'admin_post_wincobank_flush_cache', [ $this, 'handle_flush_cache' ] );
+        add_action( 'wp_ajax_wincobank_test_connection', [ $this, 'handle_test_connection' ] );
     }
 
     public function add_menu_page(): void {
@@ -93,6 +94,27 @@ class Wincobank_Admin_Settings {
         return $encrypted;
     }
 
+    public function handle_test_connection(): void {
+        check_ajax_referer( 'wincobank_test_connection' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorised', 403 );
+        }
+
+        $auth = new Wincobank_QuickFile_Auth();
+        if ( ! $auth->is_configured() ) {
+            wp_send_json_error( 'Credentials not fully configured. Fill in all three API fields and save first.' );
+        }
+
+        $api    = new Wincobank_QuickFile_API();
+        $result = $api->get_account_balances();
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( $result->get_error_message() );
+        }
+
+        wp_send_json_success( $result );
+    }
+
     public function handle_flush_cache(): void {
         check_admin_referer( 'wincobank_flush_cache' );
         if ( ! current_user_can( 'manage_options' ) ) {
@@ -139,9 +161,56 @@ class Wincobank_Admin_Settings {
                 <?php if ( $api_configured ) : ?>
                     <span style="color:green;">&#10003; <?php esc_html_e( 'API credentials are configured.', 'wincobank-dashboard' ); ?></span>
                 <?php else : ?>
-                    <span style="color:red;">&#10007; <?php esc_html_e( 'API credentials are not configured.', 'wincobank-dashboard' ); ?></span>
+                    <span style="color:red;">&#10007; <?php esc_html_e( 'API credentials are not configured. Fill in Account Number, Application ID, and API Key above.', 'wincobank-dashboard' ); ?></span>
                 <?php endif; ?>
             </p>
+            <?php if ( $api_configured ) : ?>
+            <p>
+                <button type="button" id="wb-test-connection" class="button button-secondary">
+                    <?php esc_html_e( 'Test Connection', 'wincobank-dashboard' ); ?>
+                </button>
+            </p>
+            <div id="wb-test-result" style="margin-top:12px;padding:12px;background:#f6f7f7;border:1px solid #ddd;border-radius:4px;font-family:monospace;font-size:13px;white-space:pre-wrap;display:none;max-height:300px;overflow:auto;"></div>
+            <script>
+            document.getElementById('wb-test-connection').addEventListener('click', function() {
+                var btn = this;
+                var out = document.getElementById('wb-test-result');
+                btn.disabled = true;
+                btn.textContent = '<?php echo esc_js( __( 'Testing…', 'wincobank-dashboard' ) ); ?>';
+                out.style.display = 'none';
+                fetch(ajaxurl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        action: 'wincobank_test_connection',
+                        _ajax_nonce: '<?php echo esc_js( wp_create_nonce( 'wincobank_test_connection' ) ); ?>'
+                    })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    out.style.display = 'block';
+                    if (data.success) {
+                        out.style.borderColor = '#00a32a';
+                        out.style.background  = '#f0fff4';
+                        out.textContent = '✓ Connection successful:\n\n' + JSON.stringify(data.data, null, 2);
+                    } else {
+                        out.style.borderColor = '#d63638';
+                        out.style.background  = '#fff0f0';
+                        out.textContent = '✗ ' + (data.data || 'Unknown error');
+                    }
+                })
+                .catch(function(e) {
+                    out.style.display  = 'block';
+                    out.style.background = '#fff0f0';
+                    out.textContent    = '✗ Request failed: ' + e.message;
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.textContent = '<?php echo esc_js( __( 'Test Connection', 'wincobank-dashboard' ) ); ?>';
+                });
+            });
+            </script>
+            <?php endif; ?>
 
             <h2><?php esc_html_e( 'Cache Management', 'wincobank-dashboard' ); ?></h2>
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">

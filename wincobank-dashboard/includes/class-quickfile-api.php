@@ -376,27 +376,32 @@ class Wincobank_QuickFile_API {
             );
         }
 
-        $http_code = wp_remote_retrieve_response_code( $response );
+        $http_code    = wp_remote_retrieve_response_code( $response );
+        $raw_body     = wp_remote_retrieve_body( $response );
+        $decoded_body = json_decode( $raw_body, true );
+
         if ( $http_code !== 200 ) {
+            // Include whatever QuickFile sent back so the error is actionable.
+            $detail = '';
+            if ( is_array( $decoded_body ) ) {
+                $detail = ' — ' . wp_json_encode( $decoded_body );
+            } elseif ( $raw_body !== '' ) {
+                $detail = ' — ' . substr( $raw_body, 0, 300 );
+            }
             return new WP_Error(
                 'quickfile_http_error',
-                sprintf(
-                    'QuickFile returned HTTP %d for %s. Check credentials and account IDs.',
-                    $http_code,
-                    strtoupper( $module )
-                )
+                sprintf( 'QuickFile HTTP %d (%s)%s', $http_code, strtoupper( $module ), $detail )
             );
         }
 
-        $body = json_decode( wp_remote_retrieve_body( $response ), true );
-        if ( ! is_array( $body ) ) {
+        if ( ! is_array( $decoded_body ) ) {
             return new WP_Error(
                 'quickfile_parse_error',
-                "Received an unparseable response from QuickFile ({$module})."
+                "Unparseable response from QuickFile ({$module}): " . substr( $raw_body, 0, 300 )
             );
         }
 
-        return $this->check_api_errors( $body, $module );
+        return $this->check_api_errors( $decoded_body, $module );
     }
 
     /**
