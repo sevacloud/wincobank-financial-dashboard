@@ -35,25 +35,21 @@ jobs:
 
       # ── Deploy ───────────────────────────────────────────────────────────────
 
-      - name: Configure SSH
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Deploy via rsync
-        run: |
-          rsync -az --delete --checksum \
-            --exclude='node_modules/' \
-            --exclude='assets/src/' \
-            --exclude='package.json' \
-            --exclude='package-lock.json' \
-            --exclude='.gitignore' \
-            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=yes" \
-            wincobank-dashboard/ \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/wincobank-dashboard/"
-
-      - name: Clean up SSH key
-        if: always()
-        run: rm -f ~/.ssh/deploy_key
+      - name: Deploy via SFTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          protocol: sftp
+          server: ${{ secrets.SFTP_HOST }}
+          port: ${{ secrets.SFTP_PORT }}
+          username: ${{ secrets.SFTP_USER }}
+          password: ${{ secrets.SFTP_PASS }}
+          local-dir: ./wincobank-dashboard/
+          server-dir: ${{ secrets.DEPLOY_PATH }}/wincobank-dashboard/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            assets/src/**
+            package.json
+            package-lock.json
+            .gitignore
