@@ -26,6 +26,7 @@ class Wincobank_Admin_Settings {
     public function register_settings(): void {
         $options = [
             'wincobank_business_name'     => 'sanitize_text_field',
+            'wincobank_qf_endpoint'       => 'esc_url_raw',
             'wincobank_qf_account_number' => 'sanitize_text_field',
             'wincobank_qf_application_id' => 'sanitize_text_field',
             'wincobank_cache_duration'    => 'absint',
@@ -50,6 +51,7 @@ class Wincobank_Admin_Settings {
 
         $this->add_field( 'wincobank_general', 'wincobank_business_name', __( 'Business Name', 'wincobank-dashboard' ), 'text', __( 'Displayed in the dashboard header and browser tab.', 'wincobank-dashboard' ) );
 
+        $this->add_field( 'wincobank_api', 'wincobank_qf_endpoint', __( 'API Endpoint URL', 'wincobank-dashboard' ), 'url', __( 'Found in QuickFile → Settings → API Management. Leave blank for the default.', 'wincobank-dashboard' ) );
         $this->add_field( 'wincobank_api', 'wincobank_qf_account_number', __( 'QuickFile Account Number', 'wincobank-dashboard' ), 'text' );
         $this->add_field( 'wincobank_api', 'wincobank_qf_application_id', __( 'Application ID', 'wincobank-dashboard' ), 'text', __( 'The Application ID from QuickFile Settings → API Management.', 'wincobank-dashboard' ) );
         $this->add_field( 'wincobank_api', 'wincobank_qf_api_key', __( 'API Key', 'wincobank-dashboard' ), 'password', __( 'Leave blank to keep current key.', 'wincobank-dashboard' ) );

@@ -14,8 +14,8 @@ defined( 'ABSPATH' ) || exit;
  */
 class Wincobank_QuickFile_API {
 
-    // QuickFile REST API base URL (version 1.2).
-    private const ENDPOINT = 'https://api.quickfile.co.uk/1_2/';
+    // QuickFile REST API base URL — configurable via Settings → QuickFile Dashboard.
+    private const DEFAULT_ENDPOINT = 'https://api.quickfile.co.uk/1_2/';
 
     // Transient key prefix — used by the cache-flush routine.
     public const CACHE_PREFIX = 'wincobank_qf_';
@@ -344,7 +344,8 @@ class Wincobank_QuickFile_API {
      * @return array|WP_Error  Decoded response body, or a descriptive WP_Error.
      */
     private function post( string $module, array $payload ): array|WP_Error {
-        $url  = self::ENDPOINT;
+        $base = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
+        $url  = $base;
         $args = [
             'headers' => [
                 'Content-Type' => 'application/json',
