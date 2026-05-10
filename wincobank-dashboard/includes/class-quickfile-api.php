@@ -446,6 +446,52 @@ class Wincobank_QuickFile_API {
     }
 
     // =========================================================================
+    // Diagnostics
+    // =========================================================================
+
+    /**
+     * Make a single Bank_GetAccountBalances call for the first configured
+     * account and return the full request/response details for display in
+     * the admin Test Connection output. The API key is masked in the output.
+     */
+    public function diagnostic_request(): array {
+        $account_ids = $this->account_ids();
+        $first_id    = reset( $account_ids );
+
+        $submission = $this->auth->make_submission_number();
+        $payload    = $this->build_payload( 'Bank', 'GetAccountBalances', [
+            'Bank' => [ 'BankAccountID' => (string) $first_id ],
+        ] );
+
+        $base        = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
+        $method_name = (string) array_key_first( $payload );
+        $url         = $base . $method_name;
+
+        // Mask the MD5 value in the output so credentials aren't exposed.
+        $safe_payload = $payload;
+        if ( isset( $safe_payload[ $method_name ]['Header']['MD5Value'] ) ) {
+            $safe_payload[ $method_name ]['Header']['MD5Value'] = '*** masked ***';
+        }
+
+        $args = [
+            'headers' => [ 'Content-Type' => 'application/json', 'Accept' => 'application/json' ],
+            'body'    => wp_json_encode( $payload ),
+            'timeout' => self::HTTP_TIMEOUT,
+        ];
+
+        $response  = wp_remote_post( $url, $args );
+        $http_code = is_wp_error( $response ) ? 0 : wp_remote_retrieve_response_code( $response );
+        $raw_body  = is_wp_error( $response ) ? $response->get_error_message() : wp_remote_retrieve_body( $response );
+
+        return [
+            'url'            => $url,
+            'request_body'   => $safe_payload,
+            'http_code'      => $http_code,
+            'response_body'  => substr( $raw_body, 0, 1000 ),
+        ];
+    }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
 

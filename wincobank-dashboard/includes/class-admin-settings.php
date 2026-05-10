@@ -107,14 +107,8 @@ class Wincobank_Admin_Settings {
             wp_send_json_error( 'Credentials not fully configured. Fill in all three API fields and save first.' );
         }
 
-        $api    = new Wincobank_QuickFile_API();
-        $result = $api->get_account_balances();
-
-        if ( is_wp_error( $result ) ) {
-            wp_send_json_error( $result->get_error_message() );
-        }
-
-        wp_send_json_success( $result );
+        $api  = new Wincobank_QuickFile_API();
+        wp_send_json_success( $api->diagnostic_request() );
     }
 
     public function handle_flush_cache(): void {
