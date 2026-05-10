@@ -28,7 +28,7 @@ a public GitHub issue.
 
 Report it confidentially by email to:
 
-**security@wincobank.org.uk**
+**admin@wincobankchapel.org**
 
 Please include:
 
