@@ -344,8 +344,9 @@ class Wincobank_QuickFile_API {
      * @return array|WP_Error  Decoded response body, or a descriptive WP_Error.
      */
     private function post( string $module, array $payload ): array|WP_Error {
-        $base = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
-        $url  = $base;
+        $base        = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
+        $method_name = (string) array_key_first( $payload ); // e.g. "Bank_GetAccountBalances"
+        $url         = $base . $method_name;
         $args = [
             'headers' => [
                 'Content-Type' => 'application/json',
