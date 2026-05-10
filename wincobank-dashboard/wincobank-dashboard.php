@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: Wincobank Financial Dashboard
+ * Plugin Name: QuickFile Dashboard
  * Plugin URI:  https://wincobank.org.uk
- * Description: Read-only trustee financial dashboard for The Charity of Mary Ann Rawson for Wincobank School. Connects to QuickFile accounting API.
+ * Description: Read-only financial dashboard that connects to the QuickFile accounting API. Displays balances, transactions, projects, and annual statements.
  * Version:     1.0.1
  * Author:      Seva Cloud
  * License:     GPL-2.0-or-later

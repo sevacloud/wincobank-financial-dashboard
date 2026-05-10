@@ -61,7 +61,7 @@ export default function App() {
                         <span className="wb-topbar__title">{ VIEW_TITLES[ view ] }</span>
                     </div>
                     <span className="wb-topbar__meta">
-                        { __( 'The Charity of Mary Ann Rawson for Wincobank School', 'wincobank-dashboard' ) }
+                        { window.wincobankData?.businessName || __( 'QuickFile Dashboard', 'wincobank-dashboard' ) }
                         { ' · ' }{ now }
                     </span>
                 </header>

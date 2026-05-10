@@ -10,6 +10,8 @@ const NAV_ITEMS = [
 ];
 
 export default function Nav( { activeView, onNavigate, isOpen, onClose } ) {
+    const businessName = window.wincobankData?.businessName || __( 'QuickFile', 'wincobank-dashboard' );
+
     const handleNav = ( id ) => {
         onNavigate( id );
         onClose();
@@ -17,7 +19,6 @@ export default function Nav( { activeView, onNavigate, isOpen, onClose } ) {
 
     return (
         <>
-            { /* Backdrop — mobile only */ }
             { isOpen && (
                 <div
                     className="wb-nav-backdrop"
@@ -33,8 +34,8 @@ export default function Nav( { activeView, onNavigate, isOpen, onClose } ) {
             >
                 <div className="wb-sidebar__header">
                     <div className="wb-sidebar__logo">
-                        <h1>{ __( 'Wincobank', 'wincobank-dashboard' ) }</h1>
-                        <p>{ __( 'Trustee Dashboard', 'wincobank-dashboard' ) }</p>
+                        <h1>{ businessName }</h1>
+                        <p>{ __( 'Financial Dashboard', 'wincobank-dashboard' ) }</p>
                     </div>
                     <button
                         className="wb-sidebar__close"
@@ -61,7 +62,7 @@ export default function Nav( { activeView, onNavigate, isOpen, onClose } ) {
                 </ul>
 
                 <div className="wb-sidebar__footer">
-                    { __( 'The Charity of Mary Ann Rawson', 'wincobank-dashboard' ) }
+                    { businessName }
                 </div>
             </aside>
         </>

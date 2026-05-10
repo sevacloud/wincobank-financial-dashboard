@@ -71,12 +71,13 @@ class Wincobank_Dashboard_Page {
         );
 
         wp_localize_script( 'wincobank-dashboard', 'wincobankData', [
-            'restUrl'     => esc_url_raw( rest_url( 'wincobank/v1' ) ),
-            'nonce'       => wp_create_nonce( 'wp_rest' ),
-            'currentYear' => (int) date( 'Y' ),
-            'fyStart'     => $this->current_fy_start(),
-            'fyEnd'       => $this->current_fy_end(),
-            'isAdmin'     => current_user_can( 'manage_options' ),
+            'restUrl'      => esc_url_raw( rest_url( 'wincobank/v1' ) ),
+            'nonce'        => wp_create_nonce( 'wp_rest' ),
+            'currentYear'  => (int) date( 'Y' ),
+            'fyStart'      => $this->current_fy_start(),
+            'fyEnd'        => $this->current_fy_end(),
+            'isAdmin'      => current_user_can( 'manage_options' ),
+            'businessName' => sanitize_text_field( (string) get_option( 'wincobank_business_name', '' ) ),
         ] );
     }
 
@@ -87,7 +88,10 @@ class Wincobank_Dashboard_Page {
     <meta charset="<?php bloginfo( 'charset' ); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
-    <title><?php esc_html_e( 'Wincobank Trustee Dashboard', 'wincobank-dashboard' ); ?></title>
+    <title><?php
+        $name = get_option( 'wincobank_business_name', '' );
+        echo esc_html( $name ? $name . ' — Dashboard' : 'QuickFile Dashboard' );
+    ?></title>
     <?php wp_head(); ?>
 </head>
 <body class="wincobank-dashboard-body">

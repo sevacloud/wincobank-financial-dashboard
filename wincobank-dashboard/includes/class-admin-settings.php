@@ -3,7 +3,7 @@ defined( 'ABSPATH' ) || exit;
 
 class Wincobank_Admin_Settings {
 
-    private const PAGE_SLUG    = 'wincobank-dashboard';
+    private const PAGE_SLUG    = 'quickfile-dashboard';
     private const OPTION_GROUP = 'wincobank_settings';
 
     public function init(): void {
@@ -14,8 +14,8 @@ class Wincobank_Admin_Settings {
 
     public function add_menu_page(): void {
         add_options_page(
-            __( 'Wincobank Dashboard', 'wincobank-dashboard' ),
-            __( 'Wincobank Dashboard', 'wincobank-dashboard' ),
+            __( 'QuickFile Dashboard', 'wincobank-dashboard' ),
+            __( 'QuickFile Dashboard', 'wincobank-dashboard' ),
             'manage_options',
             self::PAGE_SLUG,
             [ $this, 'render_page' ]
@@ -24,6 +24,7 @@ class Wincobank_Admin_Settings {
 
     public function register_settings(): void {
         $options = [
+            'wincobank_business_name'     => 'sanitize_text_field',
             'wincobank_qf_account_number' => 'sanitize_text_field',
             'wincobank_qf_application_id' => 'sanitize_text_field',
             'wincobank_cache_duration'    => 'absint',
@@ -41,9 +42,12 @@ class Wincobank_Admin_Settings {
             'sanitize_callback' => [ $this, 'sanitize_api_key' ],
         ] );
 
+        add_settings_section( 'wincobank_general', __( 'General', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'wincobank_api', __( 'QuickFile API Credentials', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'wincobank_accounts', __( 'Bank Account IDs', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'wincobank_cache', __( 'Cache Settings', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
+
+        $this->add_field( 'wincobank_general', 'wincobank_business_name', __( 'Business Name', 'wincobank-dashboard' ), 'text', __( 'Displayed in the dashboard header and browser tab.', 'wincobank-dashboard' ) );
 
         $this->add_field( 'wincobank_api', 'wincobank_qf_account_number', __( 'QuickFile Account Number', 'wincobank-dashboard' ), 'text' );
         $this->add_field( 'wincobank_api', 'wincobank_qf_application_id', __( 'Application ID', 'wincobank-dashboard' ), 'text', __( 'The Application ID from QuickFile Settings → API Management.', 'wincobank-dashboard' ) );
@@ -113,7 +117,7 @@ class Wincobank_Admin_Settings {
         $api_configured = ( new Wincobank_QuickFile_Auth() )->is_configured();
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e( 'Wincobank Dashboard Settings', 'wincobank-dashboard' ); ?></h1>
+            <h1><?php esc_html_e( 'QuickFile Dashboard Settings', 'wincobank-dashboard' ); ?></h1>
 
             <?php if ( isset( $_GET['cache_flushed'] ) ) : ?>
                 <div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Cache cleared successfully.', 'wincobank-dashboard' ); ?></p></div>
@@ -150,7 +154,7 @@ class Wincobank_Admin_Settings {
             <h2><?php esc_html_e( 'Dashboard', 'wincobank-dashboard' ); ?></h2>
             <p>
                 <?php
-                $dashboard_url = home_url( '/wincobank-dashboard/' );
+                $dashboard_url = home_url( '/wincobank-dashboard/' ); // URL slug is fixed; change via Permalinks if needed.
                 printf(
                     '<a href="%s" class="button button-primary">%s</a>',
                     esc_url( $dashboard_url ),
