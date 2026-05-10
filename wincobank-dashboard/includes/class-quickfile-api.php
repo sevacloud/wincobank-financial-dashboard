@@ -344,7 +344,7 @@ class Wincobank_QuickFile_API {
      * @return array|WP_Error  Decoded response body, or a descriptive WP_Error.
      */
     private function post( string $module, array $payload ): array|WP_Error {
-        $url  = self::ENDPOINT . $module;
+        $url  = self::ENDPOINT;
         $args = [
             'headers' => [
                 'Content-Type' => 'application/json',
