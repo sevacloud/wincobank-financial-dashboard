@@ -152,9 +152,10 @@ class Wincobank_QuickFile_API {
             return $raw;
         }
 
+        $root         = array_key_first( $raw );
         $transactions = $this->normalise_list(
-            $raw['Bank_Search_Response']['Transactions']['Transaction'] ?? [],
-            'TransactionID'
+            $raw[ $root ]['Body']['Transactions']['Transaction'] ?? [],
+            'TransactionId'
         );
 
         set_transient( $cache_key, $transactions, $this->cache_ttl );
