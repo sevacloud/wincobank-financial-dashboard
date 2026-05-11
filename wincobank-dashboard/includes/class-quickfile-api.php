@@ -326,7 +326,9 @@ class Wincobank_QuickFile_API {
         );
 
         return [
-            "{$module}_{$verb}" => array_merge( [ 'Header' => $header ], $body ),
+            'payload' => [
+                "{$module}_{$verb}" => array_merge( [ 'Header' => $header ], $body ),
+            ],
         ];
     }
 
@@ -345,9 +347,8 @@ class Wincobank_QuickFile_API {
      */
     private function post( string $module, array $payload ): array|WP_Error {
         $base        = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
-        $method_name = (string) array_key_first( $payload ); // e.g. "Bank_GetAccountBalances"
-        // Try both URL formats: module_action (docs) and module/action (ASP.NET MVC routing).
-        $url = $base . str_replace( '_', '/', $method_name );
+        $method_name = (string) array_key_first( $payload['payload'] ); // e.g. "Bank_GetAccountBalances"
+        $url         = $base . str_replace( '_', '/', $method_name );   // e.g. ".../Bank/GetAccountBalances"
         $args = [
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -451,12 +452,12 @@ class Wincobank_QuickFile_API {
         ] );
 
         $base        = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
-        $method_name = (string) array_key_first( $payload );
+        $method_name = (string) array_key_first( $payload['payload'] );
         $url         = $base . str_replace( '_', '/', $method_name );
 
         $safe_payload = $payload;
-        if ( isset( $safe_payload[ $method_name ]['Header']['MD5Value'] ) ) {
-            $safe_payload[ $method_name ]['Header']['MD5Value'] = '*** masked ***';
+        if ( isset( $safe_payload['payload'][ $method_name ]['Header']['MD5Value'] ) ) {
+            $safe_payload['payload'][ $method_name ]['Header']['MD5Value'] = '*** masked ***';
         }
 
         $args     = [
