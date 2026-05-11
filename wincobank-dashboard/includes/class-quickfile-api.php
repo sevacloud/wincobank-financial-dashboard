@@ -327,7 +327,10 @@ class Wincobank_QuickFile_API {
 
         return [
             'payload' => [
-                "{$module}_{$verb}" => array_merge( [ 'Header' => $header ], $body ),
+                "{$module}_{$verb}" => [
+                    'Header' => $header,
+                    'Body'   => $body,
+                ],
             ],
         ];
     }
