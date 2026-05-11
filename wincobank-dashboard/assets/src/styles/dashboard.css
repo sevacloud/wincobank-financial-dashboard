@@ -256,6 +256,9 @@ body.wincobank-dashboard-body {
 @keyframes wb-spin { to { transform: rotate(360deg); } }
 
 .wb-error { background: var(--rag-red-bg); color: var(--rag-red); border-left: 4px solid var(--rag-red); padding: 16px 20px; border-radius: var(--radius); margin-bottom: 20px; }
+.wb-api-error-banner { background: var(--rag-amber-bg); color: var(--rag-amber); border-left: 4px solid var(--rag-amber); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 20px; font-size: .9rem; }
+.wb-api-error-banner ul { margin: 6px 0 0 18px; }
+.wb-api-error-banner li { margin-top: 4px; }
 
 .wb-empty { text-align: center; padding: 48px 20px; color: var(--muted); font-size: .9375rem; }
 

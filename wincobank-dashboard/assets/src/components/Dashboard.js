@@ -1,7 +1,7 @@
 import { useState, useEffect } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { api } from '../api/client';
-import { LoadingSpinner, ErrorMessage } from './LoadingSpinner';
+import { LoadingSpinner, ErrorMessage, ApiErrorBanner } from './LoadingSpinner';
 
 const { fyStart, fyEnd, selectedAccounts = [] } = window.wincobankData || {};
 
@@ -69,6 +69,14 @@ export default function Dashboard() {
     if ( loading ) return <LoadingSpinner />;
     if ( error )   return <ErrorMessage message={ error } />;
 
+    const apiErrors = ACCOUNT_KEYS.flatMap( ( key ) => {
+        const label = ACCOUNT_LABELS[ key ] ?? key;
+        const errs = [];
+        if ( balances?.[ key ]?._error ) errs.push( { label, message: balances[ key ]._error } );
+        if ( summary?.[ key ]?._error )  errs.push( { label, message: summary[ key ]._error } );
+        return errs;
+    } );
+
     const rows = ACCOUNT_KEYS.map( ( key ) => {
         const bal    = balances?.[ key ] ?? {};
         const ytd    = sumYTD( summary?.[ key ] );
@@ -92,6 +100,7 @@ export default function Dashboard() {
 
     return (
         <div>
+            <ApiErrorBanner errors={ apiErrors } />
             {/* ---- Balance cards ---- */}
             <div className="wb-balances">
                 { rows.map( ( r ) => (

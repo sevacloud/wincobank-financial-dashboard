@@ -134,10 +134,13 @@ class Wincobank_QuickFile_API {
 
         $payload = $this->build_payload( 'Bank', 'Search', [
             'SearchParameters' => [
-                'NominalCode' => $nominal_code,
-                'FromDate'    => $from,
-                'ToDate'      => $to,
-                'ReturnCount' => $max_results,
+                'NominalCode'    => $nominal_code,
+                'FromDate'       => $from,
+                'ToDate'         => $to,
+                'ReturnCount'    => (string) $max_results,
+                'Offset'         => '0',
+                'OrderResultsBy' => 'TransactionDate',
+                'OrderDirection' => 'DESC',
             ],
         ] );
 

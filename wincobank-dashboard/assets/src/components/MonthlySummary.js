@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { api } from '../api/client';
 import DateRangeControl from './DateRangeControl';
-import { LoadingSpinner, ErrorMessage } from './LoadingSpinner';
+import { LoadingSpinner, ErrorMessage, ApiErrorBanner } from './LoadingSpinner';
 
 const { fyStart, fyEnd, selectedAccounts = [] } = window.wincobankData || {};
 
@@ -321,10 +321,19 @@ export default function MonthlySummary() {
 
     const months = data ? collectMonths( data ) : [];
 
+    const apiErrors = data
+        ? ACCOUNT_KEYS.flatMap( ( key ) =>
+            data[ key ]?._error
+                ? [ { label: ACCOUNT_LABELS[ key ] ?? key, message: data[ key ]._error } ]
+                : []
+        )
+        : [];
+
     return (
         <div>
             <DateRangeControl onFetch={ fetchData } loading={ loading } />
             { error && <ErrorMessage message={ error } /> }
+            <ApiErrorBanner errors={ apiErrors } />
             { loading && <LoadingSpinner /> }
 
             { ! loading && data && months.length > 0 && (
