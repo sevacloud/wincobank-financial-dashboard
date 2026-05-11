@@ -35,6 +35,7 @@ jobs:
       # ── Deploy ───────────────────────────────────────────────────────────────
 
       - name: Deploy via SFTP (lftp mirror)
+        timeout-minutes: 15
         uses: pressidium/lftp-mirror-action@v1
         with:
           host: ${{ secrets.SFTP_HOST }}
@@ -43,11 +44,11 @@ jobs:
           pass: ${{ secrets.SFTP_PASS }}
           localDir: ./wincobank-dashboard/
           remoteDir: ${{ secrets.DEPLOY_PATH }}/wincobank-dashboard/
-          restoreMTime: true
+          restoreMTime: false
           parallel: 3
           options: >-
-            --exclude ^node_modules/
-            --exclude ^assets/src/
+            --exclude-glob node_modules
+            --exclude-glob assets/src
             --exclude-glob package.json
             --exclude-glob package-lock.json
             --exclude-glob .gitignore
