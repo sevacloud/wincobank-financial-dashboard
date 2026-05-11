@@ -70,14 +70,18 @@ class Wincobank_Dashboard_Page {
             $asset['version']
         );
 
+        $accounts_raw  = (string) get_option( 'wincobank_selected_accounts', '[]' );
+        $accounts_list = json_decode( $accounts_raw, true );
+
         wp_localize_script( 'wincobank-dashboard', 'wincobankData', [
-            'restUrl'      => esc_url_raw( rest_url( 'wincobank/v1' ) ),
-            'nonce'        => wp_create_nonce( 'wp_rest' ),
-            'currentYear'  => (int) date( 'Y' ),
-            'fyStart'      => $this->current_fy_start(),
-            'fyEnd'        => $this->current_fy_end(),
-            'isAdmin'      => current_user_can( 'manage_options' ),
-            'businessName' => sanitize_text_field( (string) get_option( 'wincobank_business_name', '' ) ),
+            'restUrl'          => esc_url_raw( rest_url( 'wincobank/v1' ) ),
+            'nonce'            => wp_create_nonce( 'wp_rest' ),
+            'currentYear'      => (int) date( 'Y' ),
+            'fyStart'          => $this->current_fy_start(),
+            'fyEnd'            => $this->current_fy_end(),
+            'isAdmin'          => current_user_can( 'manage_options' ),
+            'businessName'     => sanitize_text_field( (string) get_option( 'wincobank_business_name', '' ) ),
+            'selectedAccounts' => is_array( $accounts_list ) ? $accounts_list : [],
         ] );
     }
 

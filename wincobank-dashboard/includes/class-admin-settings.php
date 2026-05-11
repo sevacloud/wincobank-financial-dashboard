@@ -27,14 +27,12 @@ class Wincobank_Admin_Settings {
 
     public function register_settings(): void {
         $options = [
-            'wincobank_business_name'     => 'sanitize_text_field',
-            'wincobank_qf_endpoint'       => 'esc_url_raw',
-            'wincobank_qf_account_number' => 'sanitize_text_field',
-            'wincobank_qf_application_id' => 'sanitize_text_field',
-            'wincobank_cache_duration'    => 'absint',
-            'wincobank_account_trust'     => [ $this, 'sanitize_account' ],
-            'wincobank_account_chapel'    => [ $this, 'sanitize_account' ],
-            'wincobank_account_natwest'   => [ $this, 'sanitize_account' ],
+            'wincobank_business_name'      => 'sanitize_text_field',
+            'wincobank_qf_endpoint'        => 'esc_url_raw',
+            'wincobank_qf_account_number'  => 'sanitize_text_field',
+            'wincobank_qf_application_id'  => 'sanitize_text_field',
+            'wincobank_cache_duration'     => 'absint',
+            'wincobank_selected_accounts'  => [ $this, 'sanitize_selected_accounts' ],
         ];
 
         foreach ( $options as $name => $sanitize ) {
@@ -48,7 +46,7 @@ class Wincobank_Admin_Settings {
 
         add_settings_section( 'wincobank_general', __( 'General', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'wincobank_api', __( 'QuickFile API Credentials', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
-        add_settings_section( 'wincobank_accounts', __( 'Bank Accounts', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
+        add_settings_section( 'wincobank_accounts', '', [ $this, 'render_accounts_section_header' ], self::PAGE_SLUG );
         add_settings_section( 'wincobank_cache', __( 'Cache Settings', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
 
         $this->add_field( 'wincobank_general', 'wincobank_business_name', __( 'Business Name', 'wincobank-dashboard' ), 'text', __( 'Displayed in the dashboard header and browser tab.', 'wincobank-dashboard' ) );
@@ -60,8 +58,8 @@ class Wincobank_Admin_Settings {
 
         add_settings_field(
             'wincobank_accounts_picker',
-            __( 'Account Mapping', 'wincobank-dashboard' ),
-            [ $this, 'render_account_picker' ],
+            __( 'Selected Accounts', 'wincobank-dashboard' ),
+            [ $this, 'render_account_checklist' ],
             self::PAGE_SLUG,
             'wincobank_accounts'
         );
@@ -102,17 +100,24 @@ class Wincobank_Admin_Settings {
         return $encrypted;
     }
 
-    public function sanitize_account( $value ): string {
+    public function sanitize_selected_accounts( $value ): string {
         $str  = trim( (string) $value );
-        $data = json_decode( $str, true );
-        if ( ! is_array( $data ) || empty( $data['nominalCode'] ) ) {
-            return '';
+        $list = json_decode( $str, true );
+        if ( ! is_array( $list ) ) {
+            return '[]';
         }
-        return wp_json_encode( [
-            'bankId'      => (int) ( $data['bankId']      ?? 0 ),
-            'nominalCode' => (int) ( $data['nominalCode'] ?? 0 ),
-            'name'        => sanitize_text_field( $data['name'] ?? '' ),
-        ] );
+        $clean = [];
+        foreach ( $list as $item ) {
+            if ( ! is_array( $item ) || empty( $item['nominalCode'] ) ) {
+                continue;
+            }
+            $clean[] = [
+                'bankId'      => (int) ( $item['bankId']      ?? 0 ),
+                'nominalCode' => (int) ( $item['nominalCode'] ?? 0 ),
+                'name'        => sanitize_text_field( $item['name'] ?? '' ),
+            ];
+        }
+        return wp_json_encode( $clean );
     }
 
     public function handle_get_accounts(): void {
@@ -132,92 +137,137 @@ class Wincobank_Admin_Settings {
         wp_send_json_success( $accounts );
     }
 
-    public function render_account_picker(): void {
-        $labels = [
-            'trust'   => __( 'Trust Account', 'wincobank-dashboard' ),
-            'chapel'  => __( 'Chapel House Account', 'wincobank-dashboard' ),
-            'natwest' => __( 'Chapel Bank Account', 'wincobank-dashboard' ),
-        ];
+    public function render_accounts_section_header(): void {
+        $saved = json_decode( (string) get_option( 'wincobank_selected_accounts', '[]' ), true );
+        $count = is_array( $saved ) ? count( $saved ) : 0;
+        ?>
+        <h2 style="display:flex;align-items:center;gap:8px;">
+            <?php esc_html_e( 'Bank Accounts', 'wincobank-dashboard' ); ?>
+            <button type="button" id="wb-load-accounts"
+                    title="<?php esc_attr_e( 'Load accounts from QuickFile', 'wincobank-dashboard' ); ?>"
+                    style="background:none;border:none;cursor:pointer;font-size:1em;padding:2px 4px;color:#2271b1;line-height:1;">↻</button>
+            <span id="wb-accounts-status" style="font-size:.75em;font-weight:400;font-style:italic;color:#555;">
+                <?php
+                if ( $count > 0 ) {
+                    /* translators: %d: number of accounts */
+                    printf( esc_html__( '%d account(s) selected', 'wincobank-dashboard' ), $count );
+                }
+                ?>
+            </span>
+        </h2>
+        <?php
+    }
 
-        foreach ( $labels as $key => $label ) {
-            $current = (string) get_option( "wincobank_account_{$key}", '' );
-            $current_data = json_decode( $current, true );
-            $display = is_array( $current_data ) ? esc_html( $current_data['name'] ?? '' ) : '';
-            printf(
-                '<p style="margin-bottom:10px;"><strong>%s</strong><br>
-                <select name="%s" id="%s" class="regular-text wb-account-select" style="max-width:360px;margin-top:4px;">
-                    <option value="">— %s —</option>',
-                esc_html( $label ),
-                esc_attr( "wincobank_account_{$key}" ),
-                esc_attr( "wincobank_account_{$key}" ),
-                esc_html__( 'select after loading', 'wincobank-dashboard' )
-            );
-            // Render the currently-saved option so it's pre-selected even before JS runs.
-            if ( $current !== '' ) {
-                printf(
-                    '<option value="%s" selected>%s</option>',
-                    esc_attr( $current ),
-                    esc_html( $display ?: $current )
-                );
-            }
-            echo '</select></p>';
+    public function render_account_checklist(): void {
+        $saved_json = (string) get_option( 'wincobank_selected_accounts', '[]' );
+        $saved      = json_decode( $saved_json, true );
+        if ( ! is_array( $saved ) ) {
+            $saved = [];
         }
         ?>
-        <p>
-            <button type="button" id="wb-load-accounts" class="button button-secondary">
-                <?php esc_html_e( 'Load Accounts from QuickFile', 'wincobank-dashboard' ); ?>
-            </button>
-            <span id="wb-accounts-status" style="margin-left:10px;font-style:italic;color:#555;"></span>
-        </p>
+        <div id="wb-account-checklist">
+            <?php if ( ! empty( $saved ) ) : ?>
+                <?php foreach ( $saved as $acc ) : ?>
+                    <?php
+                    $val = wp_json_encode( [
+                        'bankId'      => (int) ( $acc['bankId']      ?? 0 ),
+                        'nominalCode' => (int) ( $acc['nominalCode'] ?? 0 ),
+                        'name'        => $acc['name'] ?? '',
+                    ] );
+                    ?>
+                    <label style="display:block;margin-bottom:4px;">
+                        <input type="checkbox" class="wb-account-cb" value="<?php echo esc_attr( $val ); ?>" checked>
+                        <?php echo esc_html( $acc['name'] ?? '' ); ?>
+                        <span style="color:#888;font-size:.8em;margin-left:6px;">ID: <?php echo esc_html( (string) ( $acc['bankId'] ?? '' ) ); ?></span>
+                    </label>
+                <?php endforeach; ?>
+            <?php else : ?>
+                <p class="description" id="wb-no-accounts-msg">
+                    <?php esc_html_e( 'No accounts selected yet. Click ↻ next to "Bank Accounts" above to load accounts from QuickFile.', 'wincobank-dashboard' ); ?>
+                </p>
+            <?php endif; ?>
+        </div>
+        <input type="hidden" name="wincobank_selected_accounts" id="wb-selected-accounts-input"
+               value="<?php echo esc_attr( $saved_json ); ?>">
         <script>
-        document.getElementById('wb-load-accounts').addEventListener('click', function() {
-            var btn    = this;
-            var status = document.getElementById('wb-accounts-status');
-            btn.disabled = true;
-            status.textContent = '<?php echo esc_js( __( 'Loading…', 'wincobank-dashboard' ) ); ?>';
+        (function() {
+            var nonce    = '<?php echo esc_js( wp_create_nonce( 'wincobank_get_accounts' ) ); ?>';
+            var hiddenIn = document.getElementById('wb-selected-accounts-input');
+            var checklist= document.getElementById('wb-account-checklist');
+            var statusEl = document.getElementById('wb-accounts-status');
+            var loadBtn  = document.getElementById('wb-load-accounts');
+            var form     = document.querySelector('form[action="options.php"]');
 
-            fetch(ajaxurl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    action: 'wincobank_get_accounts',
-                    _ajax_nonce: '<?php echo esc_js( wp_create_nonce( 'wincobank_get_accounts' ) ); ?>'
-                })
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(resp) {
-                if ( ! resp.success ) {
-                    status.style.color = '#d63638';
-                    status.textContent = '✗ ' + ( resp.data || 'Unknown error' );
-                    return;
-                }
-                var accounts = resp.data;
-                var selects  = document.querySelectorAll('.wb-account-select');
-                selects.forEach(function(sel) {
-                    var currentVal = sel.value;
-                    // Keep placeholder, remove old dynamic options.
-                    while ( sel.options.length > 1 ) sel.remove(1);
-                    accounts.forEach(function(acc) {
-                        var val  = JSON.stringify({ bankId: acc.BankId, nominalCode: acc.NominalCode, name: acc.Name });
-                        var text = acc.Name + ' (' + acc.BankType + ')';
-                        var opt  = new Option(text, val);
-                        // Re-select if the stored nominalCode matches.
-                        try {
-                            var cur = JSON.parse(currentVal);
-                            if ( cur && cur.nominalCode == acc.NominalCode ) opt.selected = true;
-                        } catch(e) {}
-                        sel.appendChild(opt);
-                    });
+            function updateHiddenInput() {
+                var selected = [];
+                checklist.querySelectorAll('.wb-account-cb:checked').forEach(function(cb) {
+                    try { selected.push(JSON.parse(cb.value)); } catch(e) {}
                 });
-                status.style.color = '#00a32a';
-                status.textContent = '✓ <?php echo esc_js( __( 'Loaded. Select an account for each row, then Save Changes.', 'wincobank-dashboard' ) ); ?>';
-            })
-            .catch(function(e) {
-                status.style.color = '#d63638';
-                status.textContent = '✗ Request failed: ' + e.message;
-            })
-            .finally(function() { btn.disabled = false; });
-        });
+                hiddenIn.value = JSON.stringify(selected);
+                if ( statusEl ) {
+                    statusEl.textContent = selected.length > 0
+                        ? selected.length + ' <?php echo esc_js( __( 'account(s) selected', 'wincobank-dashboard' ) ); ?>'
+                        : '';
+                }
+            }
+
+            checklist.addEventListener('change', updateHiddenInput);
+            if ( form ) { form.addEventListener('submit', updateHiddenInput); }
+
+            if ( loadBtn ) {
+                loadBtn.addEventListener('click', function() {
+                    loadBtn.disabled = true;
+                    if ( statusEl ) { statusEl.style.color = '#555'; statusEl.textContent = '<?php echo esc_js( __( 'Loading…', 'wincobank-dashboard' ) ); ?>'; }
+
+                    fetch(ajaxurl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({ action: 'wincobank_get_accounts', _ajax_nonce: nonce })
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(resp) {
+                        if ( ! resp.success ) {
+                            if ( statusEl ) { statusEl.style.color = '#d63638'; statusEl.textContent = '✗ ' + (resp.data || 'Unknown error'); }
+                            return;
+                        }
+                        var accounts = resp.data;
+
+                        // Remember which nominalCodes are currently checked.
+                        var checkedCodes = {};
+                        checklist.querySelectorAll('.wb-account-cb:checked').forEach(function(cb) {
+                            try { var d = JSON.parse(cb.value); if (d && d.nominalCode) checkedCodes[d.nominalCode] = true; } catch(e) {}
+                        });
+
+                        // Rebuild checklist with all accounts from QuickFile.
+                        checklist.innerHTML = '';
+                        accounts.forEach(function(acc) {
+                            var val   = JSON.stringify({ bankId: acc.BankId, nominalCode: acc.NominalCode, name: acc.Name });
+                            var label = document.createElement('label');
+                            label.style.cssText = 'display:block;margin-bottom:4px;';
+                            var cb = document.createElement('input');
+                            cb.type = 'checkbox';
+                            cb.className = 'wb-account-cb';
+                            cb.value = val;
+                            if ( checkedCodes[acc.NominalCode] ) { cb.checked = true; }
+                            var sub = document.createElement('span');
+                            sub.style.cssText = 'color:#888;font-size:.8em;margin-left:6px;';
+                            sub.textContent = 'ID: ' + acc.BankId;
+                            label.appendChild(cb);
+                            label.appendChild(document.createTextNode(' ' + acc.Name + ' (' + acc.BankType + ')'));
+                            label.appendChild(sub);
+                            checklist.appendChild(label);
+                        });
+
+                        updateHiddenInput();
+                        if ( statusEl ) { statusEl.style.color = '#00a32a'; statusEl.textContent = '✓ <?php echo esc_js( __( 'Loaded — tick the accounts to include, then Save Changes.', 'wincobank-dashboard' ) ); ?>'; }
+                    })
+                    .catch(function(e) {
+                        if ( statusEl ) { statusEl.style.color = '#d63638'; statusEl.textContent = '✗ Request failed: ' + e.message; }
+                    })
+                    .finally(function() { loadBtn.disabled = false; });
+                });
+            }
+        })();
         </script>
         <?php
     }

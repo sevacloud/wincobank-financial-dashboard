@@ -3,14 +3,10 @@ import { __ } from '@wordpress/i18n';
 import { api } from '../api/client';
 import { LoadingSpinner, ErrorMessage } from './LoadingSpinner';
 
-const { fyStart, fyEnd } = window.wincobankData || {};
+const { fyStart, fyEnd, selectedAccounts = [] } = window.wincobankData || {};
 
-const ACCOUNT_KEYS   = [ 'trust', 'chapel', 'natwest' ];
-const ACCOUNT_LABELS = {
-    trust:   __( 'Trust (HSBC)',          'wincobank-dashboard' ),
-    chapel:  __( 'Chapel House (Lloyds)', 'wincobank-dashboard' ),
-    natwest: __( 'Chapel Bank (Natwest)', 'wincobank-dashboard' ),
-};
+const ACCOUNT_KEYS   = selectedAccounts.map( ( a ) => String( a.bankId ) );
+const ACCOUNT_LABELS = Object.fromEntries( selectedAccounts.map( ( a ) => [ String( a.bankId ), a.name ] ) );
 
 function fmt( v ) {
     return new Intl.NumberFormat( 'en-GB', { style: 'currency', currency: 'GBP' } ).format( v ?? 0 );

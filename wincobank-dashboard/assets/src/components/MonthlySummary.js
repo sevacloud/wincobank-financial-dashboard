@@ -4,21 +4,21 @@ import { api } from '../api/client';
 import DateRangeControl from './DateRangeControl';
 import { LoadingSpinner, ErrorMessage } from './LoadingSpinner';
 
-const { fyStart, fyEnd } = window.wincobankData || {};
+const { fyStart, fyEnd, selectedAccounts = [] } = window.wincobankData || {};
 
-const ACCOUNT_KEYS   = [ 'trust', 'chapel', 'natwest' ];
-const ACCOUNT_LABELS = {
-    trust:   __( 'Trust (HSBC)',          'wincobank-dashboard' ),
-    chapel:  __( 'Chapel House (Lloyds)', 'wincobank-dashboard' ),
-    natwest: __( 'Chapel Bank (Natwest)', 'wincobank-dashboard' ),
-};
+const ACCOUNT_KEYS   = selectedAccounts.map( ( a ) => String( a.bankId ) );
+const ACCOUNT_LABELS = Object.fromEntries( selectedAccounts.map( ( a ) => [ String( a.bankId ), a.name ] ) );
 
-// Navy / teal / gold per account
-const ACCOUNT_COLOURS = {
-    trust:   { solid: 'rgba(27,58,107,.85)',  area: 'rgba(27,58,107,.12)'  },
-    chapel:  { solid: 'rgba(13,110,110,.85)', area: 'rgba(13,110,110,.12)' },
-    natwest: { solid: 'rgba(184,134,11,.85)', area: 'rgba(184,134,11,.12)' },
-};
+const COLOUR_PALETTE = [
+    { solid: 'rgba(27,58,107,.85)',  area: 'rgba(27,58,107,.12)'  },
+    { solid: 'rgba(13,110,110,.85)', area: 'rgba(13,110,110,.12)' },
+    { solid: 'rgba(184,134,11,.85)', area: 'rgba(184,134,11,.12)' },
+    { solid: 'rgba(180,60,60,.85)',  area: 'rgba(180,60,60,.12)'  },
+    { solid: 'rgba(90,60,180,.85)',  area: 'rgba(90,60,180,.12)'  },
+];
+const ACCOUNT_COLOURS = Object.fromEntries(
+    ACCOUNT_KEYS.map( ( k, i ) => [ k, COLOUR_PALETTE[ i % COLOUR_PALETTE.length ] ] )
+);
 
 const INCOME_COLOUR = { solid: 'rgba(13,110,110,1)', area: 'rgba(13,110,110,.12)' };
 const EXPEND_COLOUR = { solid: 'rgba(184,134,11,1)', area: 'rgba(184,134,11,.12)' };

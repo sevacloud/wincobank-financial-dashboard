@@ -639,15 +639,20 @@ class Wincobank_QuickFile_API {
     }
 
     /**
-     * Return the three configured bank account IDs keyed by internal label.
+     * Return nominal codes for all selected accounts, keyed by bankId string.
      */
     private function account_nominal_codes(): array {
+        $raw  = (string) get_option( 'wincobank_selected_accounts', '[]' );
+        $list = json_decode( $raw, true );
         $codes = [];
-        foreach ( [ 'trust', 'chapel', 'natwest' ] as $label ) {
-            $raw  = (string) get_option( "wincobank_account_{$label}", '' );
-            $data = json_decode( $raw, true );
-            // Support both new JSON format {"nominalCode":1234,...} and legacy plain strings.
-            $codes[ $label ] = is_array( $data ) ? (string) ( $data['nominalCode'] ?? '' ) : $raw;
+        if ( is_array( $list ) ) {
+            foreach ( $list as $acc ) {
+                $bank_id = (string) ( $acc['bankId']      ?? '' );
+                $nominal = (string) ( $acc['nominalCode'] ?? '' );
+                if ( $bank_id !== '' && $nominal !== '' ) {
+                    $codes[ $bank_id ] = $nominal;
+                }
+            }
         }
         return $codes;
     }

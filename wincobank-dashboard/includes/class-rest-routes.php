@@ -155,21 +155,16 @@ class Wincobank_REST_Routes {
     public function get_monthly_summary( WP_REST_Request $req ): WP_REST_Response|WP_Error {
         [ $from, $to ] = $this->extract_dates( $req );
         $api            = new Wincobank_QuickFile_API();
-        $account_ids    = [
-            'trust'   => (int) get_option( 'wincobank_account_trust',   1347970 ),
-            'chapel'  => (int) get_option( 'wincobank_account_chapel',  1347971 ),
-            'natwest' => (int) get_option( 'wincobank_account_natwest', 1347978 ),
-        ];
+        $account_ids    = $this->selected_account_ids();
         $result         = [];
 
-        foreach ( $account_ids as $label => $id ) {
+        foreach ( $account_ids as $key => $id ) {
             $txns = $api->search_transactions( $id, $from, $to );
             if ( is_wp_error( $txns ) ) {
-                // Surface the error per account; don't abort the whole response.
-                $result[ $label ] = [ '_error' => $txns->get_error_message() ];
+                $result[ $key ] = [ '_error' => $txns->get_error_message() ];
                 continue;
             }
-            $result[ $label ] = $this->aggregate_monthly( $txns );
+            $result[ $key ] = $this->aggregate_monthly( $txns );
         }
 
         return new WP_REST_Response( $result );
@@ -185,16 +180,10 @@ class Wincobank_REST_Routes {
             return $combined;
         }
 
-        // Per-account (BankAccountID filter — gracefully empty if unsupported).
-        $account_ids = [
-            'trust'   => (int) get_option( 'wincobank_account_trust',   1347970 ),
-            'chapel'  => (int) get_option( 'wincobank_account_chapel',  1347971 ),
-            'natwest' => (int) get_option( 'wincobank_account_natwest', 1347978 ),
-        ];
         $result = [ 'combined' => $combined ];
-        foreach ( $account_ids as $label => $id ) {
+        foreach ( $this->selected_account_ids() as $key => $id ) {
             $data = $api->get_chart_of_accounts( $from, $to, $id );
-            $result[ $label ] = is_wp_error( $data )
+            $result[ $key ] = is_wp_error( $data )
                 ? [ '_error' => $data->get_error_message() ]
                 : $data;
         }
@@ -338,6 +327,21 @@ class Wincobank_REST_Routes {
     // -----------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------
+
+    private function selected_account_ids(): array {
+        $raw  = (string) get_option( 'wincobank_selected_accounts', '[]' );
+        $list = json_decode( $raw, true );
+        $ids  = [];
+        if ( is_array( $list ) ) {
+            foreach ( $list as $acc ) {
+                $bank_id = (string) ( $acc['bankId'] ?? '' );
+                if ( $bank_id !== '' ) {
+                    $ids[ $bank_id ] = (int) $acc['bankId'];
+                }
+            }
+        }
+        return $ids;
+    }
 
     private function date_range_args(): array {
         $date_validate = fn( $v ) => (bool) preg_match( '/^\d{4}-\d{2}-\d{2}$/', $v );
