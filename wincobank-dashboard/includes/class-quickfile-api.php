@@ -327,9 +327,9 @@ class Wincobank_QuickFile_API {
 
         return [
             'payload' => [
-                "{$module}_{$verb}" => [
-                    'Header' => $header,
-                    'Body'   => $body,
+                'Header' => $header,
+                'Body'   => [
+                    "{$module}_{$verb}" => $body,
                 ],
             ],
         ];
@@ -350,8 +350,8 @@ class Wincobank_QuickFile_API {
      */
     private function post( string $module, array $payload ): array|WP_Error {
         $base        = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
-        $method_name = (string) array_key_first( $payload['payload'] ); // e.g. "Bank_GetAccountBalances"
-        $url         = $base . str_replace( '_', '/', $method_name );   // e.g. ".../Bank/GetAccountBalances"
+        $method_name = (string) array_key_first( $payload['payload']['Body'] ); // e.g. "Bank_GetAccountBalances"
+        $url         = $base . str_replace( '_', '/', $method_name );            // e.g. ".../Bank/GetAccountBalances"
         $args = [
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -455,12 +455,12 @@ class Wincobank_QuickFile_API {
         ] );
 
         $base        = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
-        $method_name = (string) array_key_first( $payload['payload'] );
+        $method_name = (string) array_key_first( $payload['payload']['Body'] );
         $url         = $base . str_replace( '_', '/', $method_name );
 
         $safe_payload = $payload;
-        if ( isset( $safe_payload['payload'][ $method_name ]['Header']['MD5Value'] ) ) {
-            $safe_payload['payload'][ $method_name ]['Header']['MD5Value'] = '*** masked ***';
+        if ( isset( $safe_payload['payload']['Header']['MD5Value'] ) ) {
+            $safe_payload['payload']['Header']['MD5Value'] = '*** masked ***';
         }
 
         $args     = [
