@@ -482,11 +482,13 @@ class Wincobank_QuickFile_API {
 
         $this->append_log( 'Bank_GetAccountBalances', $url, $http_code, $raw_body );
 
+        $decoded_response = json_decode( $raw_body, true );
+
         return [
             'url'           => $url,
             'request_body'  => $safe_payload,
             'http_code'     => $http_code,
-            'response_body' => substr( $raw_body, 0, 1000 ),
+            'response_body' => $decoded_response !== null ? $decoded_response : substr( $raw_body, 0, 1000 ),
         ];
     }
 

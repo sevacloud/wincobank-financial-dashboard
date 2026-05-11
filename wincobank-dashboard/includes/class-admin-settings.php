@@ -181,12 +181,11 @@ class Wincobank_Admin_Settings {
                         <span style="color:#888;font-size:.8em;margin-left:6px;">ID: <?php echo esc_html( (string) ( $acc['bankId'] ?? '' ) ); ?></span>
                     </label>
                 <?php endforeach; ?>
-            <?php else : ?>
-                <p class="description" id="wb-no-accounts-msg">
-                    <?php esc_html_e( 'No accounts selected yet. Click ↻ next to "Bank Accounts" above to load accounts from QuickFile.', 'wincobank-dashboard' ); ?>
-                </p>
             <?php endif; ?>
         </div>
+        <p class="description" style="margin-top:6px;">
+            <?php esc_html_e( 'Click ↻ next to "Bank Accounts" above to load or refresh the account list from QuickFile, then tick the accounts to include.', 'wincobank-dashboard' ); ?>
+        </p>
         <input type="hidden" name="wincobank_selected_accounts" id="wb-selected-accounts-input"
                value="<?php echo esc_attr( $saved_json ); ?>">
         <script>
