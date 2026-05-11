@@ -35,7 +35,9 @@ class Wincobank_Dashboard_Page {
         }
 
         if ( ! Wincobank_Roles::current_user_is_trustee() ) {
-            wp_redirect( wp_login_url( home_url( '/' . self::SLUG . '/' ) ) );
+            $login_url = home_url( '/' . Wincobank_Login_Page::SLUG . '/' );
+            $login_url = add_query_arg( 'redirect_to', rawurlencode( home_url( '/' . self::SLUG . '/' ) ), $login_url );
+            wp_redirect( $login_url );
             exit;
         }
 

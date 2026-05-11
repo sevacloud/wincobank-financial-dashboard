@@ -403,13 +403,28 @@ class Wincobank_Admin_Settings {
             <h2><?php esc_html_e( 'Dashboard', 'wincobank-dashboard' ); ?></h2>
             <p>
                 <?php
-                $dashboard_url = home_url( '/wincobank-dashboard/' ); // URL slug is fixed; change via Permalinks if needed.
+                $dashboard_url = home_url( '/wincobank-dashboard/' );
+                $login_url     = home_url( '/' . Wincobank_Login_Page::SLUG . '/' );
                 printf(
-                    '<a href="%s" class="button button-primary">%s</a>',
+                    '<a href="%s" class="button button-primary" style="margin-right:8px;">%s</a>',
                     esc_url( $dashboard_url ),
                     esc_html__( 'Open Trustee Dashboard', 'wincobank-dashboard' )
                 );
+                printf(
+                    '<a href="%s" class="button button-secondary">%s</a>',
+                    esc_url( $login_url ),
+                    esc_html__( 'Open Login Page', 'wincobank-dashboard' )
+                );
                 ?>
+                <p class="description" style="margin-top:8px;">
+                    <?php
+                    printf(
+                        /* translators: %s: login page URL */
+                        esc_html__( 'Login URL: %s', 'wincobank-dashboard' ),
+                        '<code>' . esc_html( $login_url ) . '</code>'
+                    );
+                    ?>
+                </p>
             </p>
             <hr>
             <h2>
