@@ -72,7 +72,7 @@ class Wincobank_QuickFile_API {
                 'Bank' => [ 'BankAccountID' => (string) $id ],
             ] );
 
-            $raw = $this->post( 'bank', $payload );
+            $raw = $this->post( 'Bank', 'GetAccountBalances', $payload );
 
             if ( is_wp_error( $raw ) ) {
                 $this->log_error( 'Bank_GetAccountBalances', $label, $raw );
@@ -127,7 +127,7 @@ class Wincobank_QuickFile_API {
             ],
         ] );
 
-        $raw = $this->post( 'bank', $payload );
+        $raw = $this->post( 'Bank', 'Search', $payload );
         if ( is_wp_error( $raw ) ) {
             $this->log_error( 'Bank_Search', "account {$bank_id}", $raw );
             return $raw;
@@ -174,7 +174,7 @@ class Wincobank_QuickFile_API {
             'Parameters' => $params,
         ] );
 
-        $raw = $this->post( 'report', $payload );
+        $raw = $this->post( 'Report', 'ChartOfAccounts', $payload );
         if ( is_wp_error( $raw ) ) {
             $this->log_error( 'Report_ChartOfAccounts', "{$from} to {$to}", $raw );
             return $raw;
@@ -217,7 +217,7 @@ class Wincobank_QuickFile_API {
             'SearchParameters' => [ 'ReturnCount' => 200 ],
         ] );
 
-        $raw = $this->post( 'project', $payload );
+        $raw = $this->post( 'Project', 'TagSearch', $payload );
         if ( is_wp_error( $raw ) ) {
             $this->log_error( 'Project_TagSearch', 'all tags', $raw );
             return $raw;
@@ -277,7 +277,7 @@ class Wincobank_QuickFile_API {
                 ],
             ] );
 
-            $raw = $this->post( 'invoice', $payload );
+            $raw = $this->post( 'Invoice', 'Search', $payload );
             if ( is_wp_error( $raw ) ) {
                 $this->log_error( 'Invoice_Search', "tag={$tag_name}", $raw );
                 // Return what we have so far, or propagate the error on first page.
@@ -309,28 +309,21 @@ class Wincobank_QuickFile_API {
     /**
      * Assemble the full JSON payload for a QuickFile API call.
      *
-     * Structure:
-     *   { "{Module}_{Verb}": { "Header": {...}, ...body_nodes } }
-     *
-     * Body nodes are merged at the same level as Header — QuickFile does not
-     * use a nested Body wrapper in v1.2.
+     * The method name is encoded in the URL (Module/Verb), so Body contains
+     * only the method-specific parameters. Authentication credentials are
+     * nested inside Header.Authentication as required by the v1.2 schema.
      */
     private function build_payload( string $module, string $verb, array $body ): array {
         $submission = $this->auth->make_submission_number();
-        $header     = array_merge(
-            $this->auth->get_auth_node( $submission ),
-            [
-                'MessageType'      => 'REQUEST',
-                'SubmissionNumber' => $submission,
-            ]
-        );
 
         return [
             'payload' => [
-                'Header' => $header,
-                'Body'   => [
-                    "{$module}_{$verb}" => $body,
+                'Header' => [
+                    'MessageType'      => 'REQUEST',
+                    'SubmissionNumber' => $submission,
+                    'Authentication'   => $this->auth->get_auth_node( $submission ),
                 ],
+                'Body' => $body,
             ],
         ];
     }
@@ -344,14 +337,15 @@ class Wincobank_QuickFile_API {
      * transient network failures. Validates the HTTP status code and
      * QuickFile's own error envelope before returning the parsed body.
      *
-     * @param  string $module  e.g. 'bank', 'report', 'project', 'invoice'
+     * @param  string $module  Pascal-case module name, e.g. 'Bank', 'Report'.
+     * @param  string $verb    Pascal-case verb, e.g. 'GetAccountBalances'.
      * @param  array  $payload Request body (will be JSON-encoded).
      * @return array|WP_Error  Decoded response body, or a descriptive WP_Error.
      */
-    private function post( string $module, array $payload ): array|WP_Error {
+    private function post( string $module, string $verb, array $payload ): array|WP_Error {
         $base        = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
-        $method_name = (string) array_key_first( $payload['payload']['Body'] ); // e.g. "Bank_GetAccountBalances"
-        $url         = $base . str_replace( '_', '/', $method_name );            // e.g. ".../Bank/GetAccountBalances"
+        $method_name = "{$module}_{$verb}";
+        $url         = $base . $module . '/' . $verb;
         $args = [
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -450,17 +444,16 @@ class Wincobank_QuickFile_API {
         $account_ids = $this->account_ids();
         $first_id    = reset( $account_ids );
 
-        $payload     = $this->build_payload( 'Bank', 'GetAccountBalances', [
+        $payload = $this->build_payload( 'Bank', 'GetAccountBalances', [
             'Bank' => [ 'BankAccountID' => (string) $first_id ],
         ] );
 
-        $base        = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
-        $method_name = (string) array_key_first( $payload['payload']['Body'] );
-        $url         = $base . str_replace( '_', '/', $method_name );
+        $base = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
+        $url  = $base . 'Bank/GetAccountBalances';
 
         $safe_payload = $payload;
-        if ( isset( $safe_payload['payload']['Header']['MD5Value'] ) ) {
-            $safe_payload['payload']['Header']['MD5Value'] = '*** masked ***';
+        if ( isset( $safe_payload['payload']['Header']['Authentication']['MD5Value'] ) ) {
+            $safe_payload['payload']['Header']['Authentication']['MD5Value'] = '*** masked ***';
         }
 
         $args     = [
