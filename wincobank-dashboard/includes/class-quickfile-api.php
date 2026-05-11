@@ -79,8 +79,11 @@ class Wincobank_QuickFile_API {
             return array_map( fn( $_ ) => $this->err( $err ), $nominal_codes );
         }
 
-        // Response: Bank_GetAccountBalances_Response > Body > BankAccounts > BankAccount[]
-        $accounts_raw = $raw['Bank_GetAccountBalances_Response']['Body']['BankAccounts']['BankAccount'] ?? [];
+        // Parse response — root key varies (Bank_GetAccountBalances or _Response suffix).
+        $root         = array_key_first( $raw );
+        $accounts_raw = $raw[ $root ]['Body']['BankAccounts']['BankAccount']
+                     ?? $raw[ $root ]['Body']['BankAccounts']
+                     ?? [];
         $accounts     = $this->normalise_list( $accounts_raw, 'NominalCode' );
 
         // Index by NominalCode so we can map back to our labels.
@@ -585,13 +588,67 @@ class Wincobank_QuickFile_API {
     }
 
     /**
+     * Bank_GetAccounts
+     *
+     * Returns all bank accounts visible to this QuickFile account.
+     * Used to populate the account selector in admin settings.
+     *
+     * @return array|WP_Error  Flat list of account objects.
+     */
+    public function get_bank_accounts(): array|WP_Error {
+        $guard = $this->credentials_guard();
+        if ( is_wp_error( $guard ) ) {
+            return $guard;
+        }
+
+        $cache_key = self::CACHE_PREFIX . 'bank_accounts';
+        $cached    = get_transient( $cache_key );
+        if ( $cached !== false ) {
+            return $cached;
+        }
+
+        $payload = $this->build_payload( 'Bank', 'GetAccounts', [
+            'SearchParameters' => [
+                'OrderResultsBy' => 'Position',
+                'AccountTypes'   => [
+                    'AccountType' => [ 'CURRENT', 'PETTY', 'BUILDINGSOC', 'LOAN', 'MERCHANT', 'EQUITY', 'CREDITCARD', 'RESERVE' ],
+                ],
+                'ShowHidden'             => 'false',
+                'GetOpenBankingConsents' => 'false',
+            ],
+        ] );
+
+        $raw = $this->post( 'Bank', 'GetAccounts', $payload );
+        if ( is_wp_error( $raw ) ) {
+            $this->log_error( 'Bank_GetAccounts', 'list', $raw );
+            return $raw;
+        }
+
+        $root     = array_key_first( $raw );
+        $accounts = $raw[ $root ]['Body']['BankAccounts'] ?? [];
+
+        // Ensure flat list (QuickFile may return a single item as an object).
+        if ( isset( $accounts['BankId'] ) ) {
+            $accounts = [ $accounts ];
+        } else {
+            $accounts = array_values( $accounts );
+        }
+
+        set_transient( $cache_key, $accounts, $this->cache_ttl );
+        return $accounts;
+    }
+
+    /**
      * Return the three configured bank account IDs keyed by internal label.
      */
     private function account_nominal_codes(): array {
-        return [
-            'trust'   => (string) get_option( 'wincobank_account_trust',   '' ),
-            'chapel'  => (string) get_option( 'wincobank_account_chapel',  '' ),
-            'natwest' => (string) get_option( 'wincobank_account_natwest', '' ),
-        ];
+        $codes = [];
+        foreach ( [ 'trust', 'chapel', 'natwest' ] as $label ) {
+            $raw  = (string) get_option( "wincobank_account_{$label}", '' );
+            $data = json_decode( $raw, true );
+            // Support both new JSON format {"nominalCode":1234,...} and legacy plain strings.
+            $codes[ $label ] = is_array( $data ) ? (string) ( $data['nominalCode'] ?? '' ) : $raw;
+        }
+        return $codes;
     }
 }

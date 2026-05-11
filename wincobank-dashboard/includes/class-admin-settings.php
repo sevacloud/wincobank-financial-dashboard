@@ -11,6 +11,7 @@ class Wincobank_Admin_Settings {
         add_action( 'admin_init', [ $this, 'register_settings' ] );
         add_action( 'admin_post_wincobank_flush_cache', [ $this, 'handle_flush_cache' ] );
         add_action( 'wp_ajax_wincobank_test_connection', [ $this, 'handle_test_connection' ] );
+        add_action( 'wp_ajax_wincobank_get_accounts',    [ $this, 'handle_get_accounts' ] );
         add_action( 'admin_post_wincobank_clear_log',   [ $this, 'handle_clear_log' ] );
     }
 
@@ -31,9 +32,9 @@ class Wincobank_Admin_Settings {
             'wincobank_qf_account_number' => 'sanitize_text_field',
             'wincobank_qf_application_id' => 'sanitize_text_field',
             'wincobank_cache_duration'    => 'absint',
-            'wincobank_account_trust'     => 'sanitize_text_field',
-            'wincobank_account_chapel'    => 'sanitize_text_field',
-            'wincobank_account_natwest'   => 'sanitize_text_field',
+            'wincobank_account_trust'     => [ $this, 'sanitize_account' ],
+            'wincobank_account_chapel'    => [ $this, 'sanitize_account' ],
+            'wincobank_account_natwest'   => [ $this, 'sanitize_account' ],
         ];
 
         foreach ( $options as $name => $sanitize ) {
@@ -47,7 +48,7 @@ class Wincobank_Admin_Settings {
 
         add_settings_section( 'wincobank_general', __( 'General', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'wincobank_api', __( 'QuickFile API Credentials', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
-        add_settings_section( 'wincobank_accounts', __( 'Bank Account Nominal Codes', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
+        add_settings_section( 'wincobank_accounts', __( 'Bank Accounts', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'wincobank_cache', __( 'Cache Settings', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
 
         $this->add_field( 'wincobank_general', 'wincobank_business_name', __( 'Business Name', 'wincobank-dashboard' ), 'text', __( 'Displayed in the dashboard header and browser tab.', 'wincobank-dashboard' ) );
@@ -57,9 +58,13 @@ class Wincobank_Admin_Settings {
         $this->add_field( 'wincobank_api', 'wincobank_qf_application_id', __( 'Application ID', 'wincobank-dashboard' ), 'text', __( 'The Application ID from QuickFile Settings → API Management.', 'wincobank-dashboard' ) );
         $this->add_field( 'wincobank_api', 'wincobank_qf_api_key', __( 'API Key', 'wincobank-dashboard' ), 'password', __( 'Leave blank to keep current key.', 'wincobank-dashboard' ) );
 
-        $this->add_field( 'wincobank_accounts', 'wincobank_account_trust', __( 'Trust Account Nominal Code (HSBC)', 'wincobank-dashboard' ), 'text', __( 'QuickFile nominal code, e.g. 1200. Find it in Chart of Accounts.', 'wincobank-dashboard' ) );
-        $this->add_field( 'wincobank_accounts', 'wincobank_account_chapel', __( 'Chapel House Nominal Code (Lloyds)', 'wincobank-dashboard' ), 'text', __( 'QuickFile nominal code, e.g. 1201.', 'wincobank-dashboard' ) );
-        $this->add_field( 'wincobank_accounts', 'wincobank_account_natwest', __( 'Chapel Bank Nominal Code (Natwest)', 'wincobank-dashboard' ), 'text', __( 'QuickFile nominal code, e.g. 1202.', 'wincobank-dashboard' ) );
+        add_settings_field(
+            'wincobank_accounts_picker',
+            __( 'Account Mapping', 'wincobank-dashboard' ),
+            [ $this, 'render_account_picker' ],
+            self::PAGE_SLUG,
+            'wincobank_accounts'
+        );
 
         $this->add_field( 'wincobank_cache', 'wincobank_cache_duration', __( 'Cache Duration (seconds)', 'wincobank-dashboard' ), 'number', __( 'Default: 900 (15 minutes).', 'wincobank-dashboard' ) );
     }
@@ -95,6 +100,126 @@ class Wincobank_Admin_Settings {
         $encrypted = Wincobank_QuickFile_Auth::encrypt_api_key( $trimmed );
         update_option( 'wincobank_qf_api_key_enc', $encrypted );
         return $encrypted;
+    }
+
+    public function sanitize_account( $value ): string {
+        $str  = trim( (string) $value );
+        $data = json_decode( $str, true );
+        if ( ! is_array( $data ) || empty( $data['nominalCode'] ) ) {
+            return '';
+        }
+        return wp_json_encode( [
+            'bankId'      => (int) ( $data['bankId']      ?? 0 ),
+            'nominalCode' => (int) ( $data['nominalCode'] ?? 0 ),
+            'name'        => sanitize_text_field( $data['name'] ?? '' ),
+        ] );
+    }
+
+    public function handle_get_accounts(): void {
+        check_ajax_referer( 'wincobank_get_accounts' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorised', 403 );
+        }
+        $auth = new Wincobank_QuickFile_Auth();
+        if ( ! $auth->is_configured() ) {
+            wp_send_json_error( 'API credentials not configured. Save Account Number, Application ID, and API Key first.' );
+        }
+        $api      = new Wincobank_QuickFile_API();
+        $accounts = $api->get_bank_accounts();
+        if ( is_wp_error( $accounts ) ) {
+            wp_send_json_error( $accounts->get_error_message() );
+        }
+        wp_send_json_success( $accounts );
+    }
+
+    public function render_account_picker(): void {
+        $labels = [
+            'trust'   => __( 'Trust Account', 'wincobank-dashboard' ),
+            'chapel'  => __( 'Chapel House Account', 'wincobank-dashboard' ),
+            'natwest' => __( 'Chapel Bank Account', 'wincobank-dashboard' ),
+        ];
+
+        foreach ( $labels as $key => $label ) {
+            $current = (string) get_option( "wincobank_account_{$key}", '' );
+            $current_data = json_decode( $current, true );
+            $display = is_array( $current_data ) ? esc_html( $current_data['name'] ?? '' ) : '';
+            printf(
+                '<p style="margin-bottom:10px;"><strong>%s</strong><br>
+                <select name="%s" id="%s" class="regular-text wb-account-select" style="max-width:360px;margin-top:4px;">
+                    <option value="">— %s —</option>',
+                esc_html( $label ),
+                esc_attr( "wincobank_account_{$key}" ),
+                esc_attr( "wincobank_account_{$key}" ),
+                esc_html__( 'select after loading', 'wincobank-dashboard' )
+            );
+            // Render the currently-saved option so it's pre-selected even before JS runs.
+            if ( $current !== '' ) {
+                printf(
+                    '<option value="%s" selected>%s</option>',
+                    esc_attr( $current ),
+                    esc_html( $display ?: $current )
+                );
+            }
+            echo '</select></p>';
+        }
+        ?>
+        <p>
+            <button type="button" id="wb-load-accounts" class="button button-secondary">
+                <?php esc_html_e( 'Load Accounts from QuickFile', 'wincobank-dashboard' ); ?>
+            </button>
+            <span id="wb-accounts-status" style="margin-left:10px;font-style:italic;color:#555;"></span>
+        </p>
+        <script>
+        document.getElementById('wb-load-accounts').addEventListener('click', function() {
+            var btn    = this;
+            var status = document.getElementById('wb-accounts-status');
+            btn.disabled = true;
+            status.textContent = '<?php echo esc_js( __( 'Loading…', 'wincobank-dashboard' ) ); ?>';
+
+            fetch(ajaxurl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    action: 'wincobank_get_accounts',
+                    _ajax_nonce: '<?php echo esc_js( wp_create_nonce( 'wincobank_get_accounts' ) ); ?>'
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                if ( ! resp.success ) {
+                    status.style.color = '#d63638';
+                    status.textContent = '✗ ' + ( resp.data || 'Unknown error' );
+                    return;
+                }
+                var accounts = resp.data;
+                var selects  = document.querySelectorAll('.wb-account-select');
+                selects.forEach(function(sel) {
+                    var currentVal = sel.value;
+                    // Keep placeholder, remove old dynamic options.
+                    while ( sel.options.length > 1 ) sel.remove(1);
+                    accounts.forEach(function(acc) {
+                        var val  = JSON.stringify({ bankId: acc.BankId, nominalCode: acc.NominalCode, name: acc.Name });
+                        var text = acc.Name + ' (' + acc.BankType + ')';
+                        var opt  = new Option(text, val);
+                        // Re-select if the stored nominalCode matches.
+                        try {
+                            var cur = JSON.parse(currentVal);
+                            if ( cur && cur.nominalCode == acc.NominalCode ) opt.selected = true;
+                        } catch(e) {}
+                        sel.appendChild(opt);
+                    });
+                });
+                status.style.color = '#00a32a';
+                status.textContent = '✓ <?php echo esc_js( __( 'Loaded. Select an account for each row, then Save Changes.', 'wincobank-dashboard' ) ); ?>';
+            })
+            .catch(function(e) {
+                status.style.color = '#d63638';
+                status.textContent = '✗ Request failed: ' + e.message;
+            })
+            .finally(function() { btn.disabled = false; });
+        });
+        </script>
+        <?php
     }
 
     public function handle_test_connection(): void {
