@@ -132,19 +132,23 @@ class Wincobank_REST_Routes {
     // -----------------------------------------------------------------
 
     public function get_balances(): WP_REST_Response|WP_Error {
+        $year    = (int) date( 'Y' );
+        $month   = (int) date( 'n' );
+        $fy_from = ( $month >= 4 ? $year : $year - 1 ) . '-04-01';
+        $fy_to   = date( 'Y-m-d' );
+
         $api     = new Wincobank_QuickFile_API();
-        $results = $api->get_account_balances();
+        $results = $api->get_account_balances( $fy_from, $fy_to );
 
         if ( is_wp_error( $results ) ) {
             return $results;
         }
 
-        // Unwrap per-account envelopes: merge balance data to top level so the
-        // React client can read fields (e.g. CurrentBalance) directly.
-        // Accounts that errored carry a _error field instead.
+        // Unwrap per-account envelopes. data = MetaData node from Bank_Search,
+        // which contains CurrentBalance, BankName, Currency, etc.
         $response = [];
-        foreach ( $results as $label => $envelope ) {
-            $response[ $label ] = $envelope['error'] !== null
+        foreach ( $results as $key => $envelope ) {
+            $response[ $key ] = $envelope['error'] !== null
                 ? [ '_error' => $envelope['error'] ]
                 : array_merge( (array) $envelope['data'], [ '_cached' => $envelope['cached'] ] );
         }
@@ -158,12 +162,12 @@ class Wincobank_REST_Routes {
         $result         = [];
 
         foreach ( $this->selected_nominal_codes() as $key => $nominal_code ) {
-            $txns = $api->search_transactions( $nominal_code, $from, $to );
-            if ( is_wp_error( $txns ) ) {
-                $result[ $key ] = [ '_error' => $txns->get_error_message() ];
+            $search = $api->search_transactions( $nominal_code, $from, $to );
+            if ( is_wp_error( $search ) ) {
+                $result[ $key ] = [ '_error' => $search->get_error_message() ];
                 continue;
             }
-            $result[ $key ] = $this->aggregate_monthly( $txns );
+            $result[ $key ] = $this->aggregate_monthly( $search['transactions'] ?? [] );
         }
 
         return new WP_REST_Response( $result );

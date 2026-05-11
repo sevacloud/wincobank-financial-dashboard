@@ -39,68 +39,36 @@ class Wincobank_QuickFile_API {
     // =========================================================================
 
     /**
-     * Bank_GetAccountBalances
+     * Get live bank account balances via Bank_Search.
      *
-     * Returns live balances for all three configured accounts.
-     * Each account is fetched and cached independently so a single failing
-     * account does not prevent the others from being returned.
+     * CurrentBalance (and account metadata) is returned in the MetaData node
+     * of every Bank_Search response. This method calls search_transactions()
+     * per account and extracts that data. The transient cache is shared with
+     * the monthly-summary calls, so no extra API round-trips are incurred when
+     * the dashboard loads both panels simultaneously.
      *
-     * @return array{
-     *   trust:   array{ data: array, cached: bool, error: string|null },
-     *   chapel:  array{ data: array, cached: bool, error: string|null },
-     *   natwest: array{ data: array, cached: bool, error: string|null }
-     * }|WP_Error  WP_Error only if credentials are not configured.
+     * @param  string $from  Start of the period (YYYY-MM-DD).
+     * @param  string $to    End of the period / today (YYYY-MM-DD).
+     * @return array  Keyed by bankId string: { data: MetaData, cached: bool, error: string|null }
      */
-    public function get_account_balances(): array|WP_Error {
+    public function get_account_balances( string $from, string $to ): array|WP_Error {
         $guard = $this->credentials_guard();
         if ( is_wp_error( $guard ) ) {
             return $guard;
         }
 
         $nominal_codes = $this->account_nominal_codes();
-        $cache_key     = self::CACHE_PREFIX . 'balances_' . md5( implode( '|', $nominal_codes ) );
-        $cached        = get_transient( $cache_key );
+        $results       = [];
 
-        if ( $cached !== false ) {
-            return array_map( fn( $d ) => $this->ok( $d, true ), $cached );
+        foreach ( $nominal_codes as $key => $code ) {
+            $search = $this->search_transactions( $code, $from, $to );
+            if ( is_wp_error( $search ) ) {
+                $results[ $key ] = $this->err( $search->get_error_message() );
+            } else {
+                $results[ $key ] = $this->ok( $search['meta'] ?? [] );
+            }
         }
 
-        $payload = $this->build_payload( 'Bank', 'GetAccountBalances', [
-            'NominalCodes' => [
-                'NominalCode' => array_values( $nominal_codes ),
-            ],
-        ] );
-
-        $raw = $this->post( 'Bank', 'GetAccountBalances', $payload );
-
-        if ( is_wp_error( $raw ) ) {
-            $this->log_error( 'Bank_GetAccountBalances', 'all accounts', $raw );
-            $err = $raw->get_error_message();
-            return array_map( fn( $_ ) => $this->err( $err ), $nominal_codes );
-        }
-
-        // Parse response — AccountBalances is a flat array; keep BankAccounts
-        // paths as fallback in case the schema changes.
-        $root         = array_key_first( $raw );
-        $accounts_raw = $raw[ $root ]['Body']['AccountBalances']
-                     ?? $raw[ $root ]['Body']['BankAccounts']['BankAccount']
-                     ?? $raw[ $root ]['Body']['BankAccounts']
-                     ?? [];
-        $accounts     = $this->normalise_list( $accounts_raw, 'NominalCode' );
-
-        // Index by NominalCode so we can map back to our labels.
-        $by_code = [];
-        foreach ( $accounts as $account ) {
-            $by_code[ (string) ( $account['NominalCode'] ?? '' ) ] = $account;
-        }
-
-        $results = [];
-        foreach ( $nominal_codes as $label => $code ) {
-            $data             = $by_code[ $code ] ?? [];
-            $results[ $label ] = $this->ok( $data );
-        }
-
-        set_transient( $cache_key, array_map( fn( $r ) => $r['data'], $results ), $this->cache_ttl );
         return $results;
     }
 
@@ -128,7 +96,8 @@ class Wincobank_QuickFile_API {
             return $guard;
         }
 
-        $cache_key = self::CACHE_PREFIX . 'txn_' . md5( "{$nominal_code}|{$from}|{$to}|{$max_results}" );
+        // Cache key prefix 'txn2' distinguishes from old format (flat transactions array).
+        $cache_key = self::CACHE_PREFIX . 'txn2_' . md5( "{$nominal_code}|{$from}|{$to}|{$max_results}" );
         $cached    = get_transient( $cache_key );
         if ( $cached !== false ) {
             return $cached;
@@ -155,13 +124,17 @@ class Wincobank_QuickFile_API {
         }
 
         $root         = array_key_first( $raw );
+        $meta         = $raw[ $root ]['Body']['MetaData']                     ?? [];
         $transactions = $this->normalise_list(
             $raw[ $root ]['Body']['Transactions']['Transaction'] ?? [],
             'TransactionId'
         );
 
-        set_transient( $cache_key, $transactions, $this->cache_ttl );
-        return $transactions;
+        // Return meta (contains CurrentBalance, BankName, etc.) alongside transactions
+        // so callers can extract balance data without a second API call.
+        $result = [ 'meta' => $meta, 'transactions' => $transactions ];
+        set_transient( $cache_key, $result, $this->cache_ttl );
+        return $result;
     }
 
     /**
@@ -464,15 +437,27 @@ class Wincobank_QuickFile_API {
 
     public function diagnostic_request(): array {
         $nominal_codes = $this->account_nominal_codes();
+        $first_code    = (string) reset( $nominal_codes );
 
-        $payload = $this->build_payload( 'Bank', 'GetAccountBalances', [
-            'NominalCodes' => [
-                'NominalCode' => array_values( $nominal_codes ),
+        $today = date( 'Y-m-d' );
+        $year  = (int) date( 'Y' );
+        $month = (int) date( 'n' );
+        $fy_from = ( $month >= 4 ? $year : $year - 1 ) . '-04-01';
+
+        $payload = $this->build_payload( 'Bank', 'Search', [
+            'SearchParameters' => [
+                'NominalCode'    => $first_code,
+                'FromDate'       => $fy_from,
+                'ToDate'         => $today,
+                'ReturnCount'    => 5,
+                'Offset'         => 0,
+                'OrderResultsBy' => 'TransactionDate',
+                'OrderDirection' => 'DESC',
             ],
         ] );
 
         $base = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
-        $url  = $base . 'Bank/GetAccountBalances';
+        $url  = $base . 'Bank/Search';
 
         $safe_payload = $payload;
         if ( isset( $safe_payload['payload']['Header']['Authentication']['MD5Value'] ) ) {
@@ -488,7 +473,7 @@ class Wincobank_QuickFile_API {
         $http_code = is_wp_error( $response ) ? 0 : wp_remote_retrieve_response_code( $response );
         $raw_body  = is_wp_error( $response ) ? $response->get_error_message() : wp_remote_retrieve_body( $response );
 
-        $this->append_log( 'Bank_GetAccountBalances', $url, $http_code, $raw_body );
+        $this->append_log( 'Bank_Search', $url, $http_code, $raw_body );
 
         $decoded_response = json_decode( $raw_body, true );
 

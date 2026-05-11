@@ -80,9 +80,9 @@ export default function Dashboard() {
     const rows = ACCOUNT_KEYS.map( ( key ) => {
         const bal    = balances?.[ key ] ?? {};
         const ytd    = sumYTD( summary?.[ key ] );
-        // Bank_GetAccountBalances returns Amount; keep CurrentBalance/Balance as fallbacks.
-        const live    = parseFloat( bal.Amount ?? bal.CurrentBalance ?? bal.Balance ?? 0 );
-        // No opening balance in this response — use live as baseline.
+        // MetaData.CurrentBalance is the live bank balance from Bank_Search.
+        const live    = parseFloat( bal.CurrentBalance ?? bal.Amount ?? bal.Balance ?? 0 );
+        // No opening balance provided by this endpoint; use live as baseline so net = 0.
         const opening = parseFloat( bal.OpeningBalance ?? bal.StartBalance ?? live );
         const net     = live - opening;
         return { key, live, opening, ytd, net, hasErr: !! bal._error, errMsg: bal._error };
