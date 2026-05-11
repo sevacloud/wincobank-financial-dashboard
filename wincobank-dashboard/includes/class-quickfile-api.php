@@ -465,7 +465,7 @@ class Wincobank_QuickFile_API {
         $http_code = is_wp_error( $response ) ? 0 : wp_remote_retrieve_response_code( $response );
         $raw_body  = is_wp_error( $response ) ? $response->get_error_message() : wp_remote_retrieve_body( $response );
 
-        $this->append_log( $method_name, $url, $http_code, $raw_body );
+        $this->append_log( 'Bank_GetAccountBalances', $url, $http_code, $raw_body );
 
         return [
             'url'           => $url,
