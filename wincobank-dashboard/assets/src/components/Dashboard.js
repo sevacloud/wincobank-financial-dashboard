@@ -80,8 +80,9 @@ export default function Dashboard() {
     const rows = ACCOUNT_KEYS.map( ( key ) => {
         const bal    = balances?.[ key ] ?? {};
         const ytd    = sumYTD( summary?.[ key ] );
-        const live   = parseFloat( bal.CurrentBalance ?? bal.Balance ?? 0 );
-        // QuickFile returns OpeningBalance or StartBalance; fall back to live if absent.
+        // Bank_GetAccountBalances returns Amount; keep CurrentBalance/Balance as fallbacks.
+        const live    = parseFloat( bal.Amount ?? bal.CurrentBalance ?? bal.Balance ?? 0 );
+        // No opening balance in this response — use live as baseline.
         const opening = parseFloat( bal.OpeningBalance ?? bal.StartBalance ?? live );
         const net     = live - opening;
         return { key, live, opening, ytd, net, hasErr: !! bal._error, errMsg: bal._error };

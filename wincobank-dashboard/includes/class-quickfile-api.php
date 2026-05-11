@@ -79,9 +79,11 @@ class Wincobank_QuickFile_API {
             return array_map( fn( $_ ) => $this->err( $err ), $nominal_codes );
         }
 
-        // Parse response — root key varies (Bank_GetAccountBalances or _Response suffix).
+        // Parse response — AccountBalances is a flat array; keep BankAccounts
+        // paths as fallback in case the schema changes.
         $root         = array_key_first( $raw );
-        $accounts_raw = $raw[ $root ]['Body']['BankAccounts']['BankAccount']
+        $accounts_raw = $raw[ $root ]['Body']['AccountBalances']
+                     ?? $raw[ $root ]['Body']['BankAccounts']['BankAccount']
                      ?? $raw[ $root ]['Body']['BankAccounts']
                      ?? [];
         $accounts     = $this->normalise_list( $accounts_raw, 'NominalCode' );
@@ -513,7 +515,7 @@ class Wincobank_QuickFile_API {
             'method'    => $method,
             'url'       => $url,
             'http_code' => $http_code,
-            'response'  => substr( $raw_body, 0, 500 ),
+            'response'  => substr( $raw_body, 0, 3000 ),
         ];
         // Keep last 30 entries.
         if ( count( $log ) > 30 ) {
