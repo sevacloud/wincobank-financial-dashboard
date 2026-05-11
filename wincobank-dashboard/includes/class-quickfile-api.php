@@ -317,9 +317,8 @@ class Wincobank_QuickFile_API {
         $submission = $this->auth->make_submission_number();
 
         return [
-            'payload' => [
+            "{$module}_{$verb}" => [
                 'Header' => [
-                    'MessageType'      => 'REQUEST',
                     'SubmissionNumber' => $submission,
                     'Authentication'   => $this->auth->get_auth_node( $submission ),
                 ],
@@ -345,7 +344,7 @@ class Wincobank_QuickFile_API {
     private function post( string $module, string $verb, array $payload ): array|WP_Error {
         $base        = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
         $method_name = "{$module}_{$verb}";
-        $url         = $base . $module . '/' . $verb;
+        $url         = $base;
         $args = [
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -449,11 +448,11 @@ class Wincobank_QuickFile_API {
         ] );
 
         $base = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
-        $url  = $base . 'Bank/GetAccountBalances';
+        $url  = $base;
 
         $safe_payload = $payload;
-        if ( isset( $safe_payload['payload']['Header']['Authentication']['MD5Value'] ) ) {
-            $safe_payload['payload']['Header']['Authentication']['MD5Value'] = '*** masked ***';
+        if ( isset( $safe_payload['Bank_GetAccountBalances']['Header']['Authentication']['MD5Value'] ) ) {
+            $safe_payload['Bank_GetAccountBalances']['Header']['Authentication']['MD5Value'] = '*** masked ***';
         }
 
         $args     = [
