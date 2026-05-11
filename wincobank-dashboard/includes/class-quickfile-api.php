@@ -116,7 +116,7 @@ class Wincobank_QuickFile_API {
      * @return array|WP_Error
      */
     public function search_transactions(
-        int    $bank_id,
+        string $nominal_code,
         string $from,
         string $to,
         int    $max_results = 500
@@ -126,7 +126,7 @@ class Wincobank_QuickFile_API {
             return $guard;
         }
 
-        $cache_key = self::CACHE_PREFIX . 'txn_' . md5( "{$bank_id}|{$from}|{$to}|{$max_results}" );
+        $cache_key = self::CACHE_PREFIX . 'txn_' . md5( "{$nominal_code}|{$from}|{$to}|{$max_results}" );
         $cached    = get_transient( $cache_key );
         if ( $cached !== false ) {
             return $cached;
@@ -134,16 +134,16 @@ class Wincobank_QuickFile_API {
 
         $payload = $this->build_payload( 'Bank', 'Search', [
             'SearchParameters' => [
-                'BankID'     => (string) $bank_id,
-                'FromDate'   => $from,
-                'ToDate'     => $to,
-                'MaxResults' => $max_results,
+                'NominalCode' => $nominal_code,
+                'FromDate'    => $from,
+                'ToDate'      => $to,
+                'ReturnCount' => $max_results,
             ],
         ] );
 
         $raw = $this->post( 'Bank', 'Search', $payload );
         if ( is_wp_error( $raw ) ) {
-            $this->log_error( 'Bank_Search', "account {$bank_id}", $raw );
+            $this->log_error( 'Bank_Search', "nominal {$nominal_code}", $raw );
             return $raw;
         }
 

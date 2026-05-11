@@ -155,11 +155,10 @@ class Wincobank_REST_Routes {
     public function get_monthly_summary( WP_REST_Request $req ): WP_REST_Response|WP_Error {
         [ $from, $to ] = $this->extract_dates( $req );
         $api            = new Wincobank_QuickFile_API();
-        $account_ids    = $this->selected_account_ids();
         $result         = [];
 
-        foreach ( $account_ids as $key => $id ) {
-            $txns = $api->search_transactions( $id, $from, $to );
+        foreach ( $this->selected_nominal_codes() as $key => $nominal_code ) {
+            $txns = $api->search_transactions( $nominal_code, $from, $to );
             if ( is_wp_error( $txns ) ) {
                 $result[ $key ] = [ '_error' => $txns->get_error_message() ];
                 continue;
@@ -341,6 +340,22 @@ class Wincobank_REST_Routes {
             }
         }
         return $ids;
+    }
+
+    private function selected_nominal_codes(): array {
+        $raw  = (string) get_option( 'wincobank_selected_accounts', '[]' );
+        $list = json_decode( $raw, true );
+        $codes = [];
+        if ( is_array( $list ) ) {
+            foreach ( $list as $acc ) {
+                $bank_id = (string) ( $acc['bankId']      ?? '' );
+                $nominal = (string) ( $acc['nominalCode'] ?? '' );
+                if ( $bank_id !== '' && $nominal !== '' ) {
+                    $codes[ $bank_id ] = $nominal;
+                }
+            }
+        }
+        return $codes;
     }
 
     private function date_range_args(): array {
