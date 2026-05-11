@@ -119,7 +119,7 @@ class Wincobank_QuickFile_API {
         string $nominal_code,
         string $from,
         string $to,
-        int    $max_results = 500
+        int    $max_results = 100
     ): array|WP_Error {
         $guard = $this->credentials_guard();
         if ( is_wp_error( $guard ) ) {
@@ -132,13 +132,15 @@ class Wincobank_QuickFile_API {
             return $cached;
         }
 
+        $return_count = max( 1, min( 200, $max_results ?: 100 ) );
+
         $payload = $this->build_payload( 'Bank', 'Search', [
             'SearchParameters' => [
                 'NominalCode'    => $nominal_code,
                 'FromDate'       => $from,
                 'ToDate'         => $to,
-                'ReturnCount'    => (string) $max_results,
-                'Offset'         => '0',
+                'ReturnCount'    => (int) $return_count,
+                'Offset'         => 0,
                 'OrderResultsBy' => 'TransactionDate',
                 'OrderDirection' => 'DESC',
             ],
