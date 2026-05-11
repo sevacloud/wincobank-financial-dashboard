@@ -119,6 +119,21 @@ class Wincobank_REST_Routes {
             ],
         ] );
 
+        register_rest_route( self::NAMESPACE, '/transactions', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'get_transactions' ],
+            'permission_callback' => $auth,
+            'args'                => array_merge(
+                $this->date_range_args(),
+                [
+                    'account' => [
+                        'required'          => true,
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ],
+                ]
+            ),
+        ] );
+
         // Cache-bust endpoint (admin only).
         register_rest_route( self::NAMESPACE, '/flush-cache', [
             'methods'             => 'POST',
@@ -192,6 +207,30 @@ class Wincobank_REST_Routes {
         }
 
         return new WP_REST_Response( $result );
+    }
+
+    public function get_transactions( WP_REST_Request $req ): WP_REST_Response|WP_Error {
+        [ $from, $to ] = $this->extract_dates( $req );
+        $account_key   = $req->get_param( 'account' );
+
+        $codes        = $this->selected_nominal_codes();
+        $nominal_code = $codes[ $account_key ] ?? '';
+
+        if ( $nominal_code === '' ) {
+            return new WP_Error( 'not_found', 'Account not configured.', [ 'status' => 404 ] );
+        }
+
+        $api    = new Wincobank_QuickFile_API();
+        $search = $api->search_transactions( $nominal_code, $from, $to, 200 );
+
+        if ( is_wp_error( $search ) ) {
+            return $search;
+        }
+
+        return new WP_REST_Response( [
+            'meta'         => $search['meta']         ?? [],
+            'transactions' => $search['transactions'] ?? [],
+        ] );
     }
 
     public function get_projects( WP_REST_Request $req ): WP_REST_Response|WP_Error {

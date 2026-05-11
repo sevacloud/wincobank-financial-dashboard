@@ -1,7 +1,8 @@
-import { useState, useEffect } from '@wordpress/element';
+import { useState, useEffect, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { api } from '../api/client';
 import { LoadingSpinner, ErrorMessage, ApiErrorBanner } from './LoadingSpinner';
+import TransactionList from './TransactionList';
 
 const { fyStart, fyEnd, selectedAccounts = [] } = window.wincobankData || {};
 
@@ -51,10 +52,14 @@ function signed( n ) {
 }
 
 export default function Dashboard() {
-    const [ balances, setBalances ] = useState( null );
-    const [ summary,  setSummary  ] = useState( null );
-    const [ loading,  setLoading  ] = useState( true );
-    const [ error,    setError    ] = useState( null );
+    const [ balances,  setBalances  ] = useState( null );
+    const [ summary,   setSummary   ] = useState( null );
+    const [ loading,   setLoading   ] = useState( true );
+    const [ error,     setError     ] = useState( null );
+    const [ drawerKey, setDrawerKey ] = useState( null );
+
+    const openDrawer  = useCallback( ( key ) => setDrawerKey( key ), [] );
+    const closeDrawer = useCallback( () => setDrawerKey( null ), [] );
 
     useEffect( () => {
         Promise.all( [
@@ -107,8 +112,13 @@ export default function Dashboard() {
                 { rows.map( ( r ) => (
                     <div
                         key={ r.key }
-                        className="wb-balance-card"
+                        className="wb-balance-card wb-balance-card--clickable"
                         style={ { borderTopColor: r.hasErr ? 'var(--rag-red)' : 'var(--teal)' } }
+                        role="button"
+                        tabIndex={ 0 }
+                        onClick={ () => openDrawer( r.key ) }
+                        onKeyDown={ ( e ) => ( e.key === 'Enter' || e.key === ' ' ) && openDrawer( r.key ) }
+                        title={ __( 'View transactions', 'wincobank-dashboard' ) }
                     >
                         <div className="wb-balance-card__label">{ ACCOUNT_LABELS[ r.key ] }</div>
                         { r.hasErr ? (
@@ -208,6 +218,14 @@ export default function Dashboard() {
                 { __( 'Financial year:', 'wincobank-dashboard' ) } { fyStart } { __( 'to', 'wincobank-dashboard' ) } { fyEnd }
                 { ' · ' }{ __( 'Balances refreshed every 15 minutes', 'wincobank-dashboard' ) }
             </p>
+
+            { drawerKey && (
+                <TransactionList
+                    accountKey={ drawerKey }
+                    accountLabel={ ACCOUNT_LABELS[ drawerKey ] ?? drawerKey }
+                    onClose={ closeDrawer }
+                />
+            ) }
         </div>
     );
 }
