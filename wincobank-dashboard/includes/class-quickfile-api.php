@@ -57,34 +57,45 @@ class Wincobank_QuickFile_API {
             return $guard;
         }
 
+        $nominal_codes = $this->account_nominal_codes();
+        $cache_key     = self::CACHE_PREFIX . 'balances_' . md5( implode( '|', $nominal_codes ) );
+        $cached        = get_transient( $cache_key );
+
+        if ( $cached !== false ) {
+            return array_map( fn( $d ) => $this->ok( $d, true ), $cached );
+        }
+
+        $payload = $this->build_payload( 'Bank', 'GetAccountBalances', [
+            'NominalCodes' => [
+                'NominalCode' => array_values( $nominal_codes ),
+            ],
+        ] );
+
+        $raw = $this->post( 'Bank', 'GetAccountBalances', $payload );
+
+        if ( is_wp_error( $raw ) ) {
+            $this->log_error( 'Bank_GetAccountBalances', 'all accounts', $raw );
+            $err = $raw->get_error_message();
+            return array_map( fn( $_ ) => $this->err( $err ), $nominal_codes );
+        }
+
+        // Response: Bank_GetAccountBalances_Response > Body > BankAccounts > BankAccount[]
+        $accounts_raw = $raw['Bank_GetAccountBalances_Response']['Body']['BankAccounts']['BankAccount'] ?? [];
+        $accounts     = $this->normalise_list( $accounts_raw, 'NominalCode' );
+
+        // Index by NominalCode so we can map back to our labels.
+        $by_code = [];
+        foreach ( $accounts as $account ) {
+            $by_code[ (string) ( $account['NominalCode'] ?? '' ) ] = $account;
+        }
+
         $results = [];
-
-        foreach ( $this->account_ids() as $label => $id ) {
-            $cache_key = self::CACHE_PREFIX . "balance_{$id}";
-            $cached    = get_transient( $cache_key );
-
-            if ( $cached !== false ) {
-                $results[ $label ] = $this->ok( $cached, true );
-                continue;
-            }
-
-            $payload = $this->build_payload( 'Bank', 'GetAccountBalances', [
-                'Bank' => [ 'BankAccountID' => (string) $id ],
-            ] );
-
-            $raw = $this->post( 'Bank', 'GetAccountBalances', $payload );
-
-            if ( is_wp_error( $raw ) ) {
-                $this->log_error( 'Bank_GetAccountBalances', $label, $raw );
-                $results[ $label ] = $this->err( $raw->get_error_message() );
-                continue;
-            }
-
-            $data = $raw['Bank_GetAccountBalances_Response']['AccountDetails'] ?? [];
-            set_transient( $cache_key, $data, $this->cache_ttl );
+        foreach ( $nominal_codes as $label => $code ) {
+            $data             = $by_code[ $code ] ?? [];
             $results[ $label ] = $this->ok( $data );
         }
 
+        set_transient( $cache_key, array_map( fn( $r ) => $r['data'], $results ), $this->cache_ttl );
         return $results;
     }
 
@@ -317,8 +328,9 @@ class Wincobank_QuickFile_API {
         $submission = $this->auth->make_submission_number();
 
         return [
-            "{$module}_{$verb}" => [
+            'payload' => [
                 'Header' => [
+                    'MessageType'      => 'Request',
                     'SubmissionNumber' => $submission,
                     'Authentication'   => $this->auth->get_auth_node( $submission ),
                 ],
@@ -344,7 +356,7 @@ class Wincobank_QuickFile_API {
     private function post( string $module, string $verb, array $payload ): array|WP_Error {
         $base        = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
         $method_name = "{$module}_{$verb}";
-        $url         = $base;
+        $url         = $base . $module . '/' . $verb;
         $args = [
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -440,19 +452,20 @@ class Wincobank_QuickFile_API {
     // =========================================================================
 
     public function diagnostic_request(): array {
-        $account_ids = $this->account_ids();
-        $first_id    = reset( $account_ids );
+        $nominal_codes = $this->account_nominal_codes();
 
         $payload = $this->build_payload( 'Bank', 'GetAccountBalances', [
-            'Bank' => [ 'BankAccountID' => (string) $first_id ],
+            'NominalCodes' => [
+                'NominalCode' => array_values( $nominal_codes ),
+            ],
         ] );
 
         $base = rtrim( (string) get_option( 'wincobank_qf_endpoint', self::DEFAULT_ENDPOINT ), '/' ) . '/';
-        $url  = $base;
+        $url  = $base . 'Bank/GetAccountBalances';
 
         $safe_payload = $payload;
-        if ( isset( $safe_payload['Bank_GetAccountBalances']['Header']['Authentication']['MD5Value'] ) ) {
-            $safe_payload['Bank_GetAccountBalances']['Header']['Authentication']['MD5Value'] = '*** masked ***';
+        if ( isset( $safe_payload['payload']['Header']['Authentication']['MD5Value'] ) ) {
+            $safe_payload['payload']['Header']['Authentication']['MD5Value'] = '*** masked ***';
         }
 
         $args     = [
@@ -574,11 +587,11 @@ class Wincobank_QuickFile_API {
     /**
      * Return the three configured bank account IDs keyed by internal label.
      */
-    private function account_ids(): array {
+    private function account_nominal_codes(): array {
         return [
-            'trust'   => (int) get_option( 'wincobank_account_trust',   1347970 ),
-            'chapel'  => (int) get_option( 'wincobank_account_chapel',  1347971 ),
-            'natwest' => (int) get_option( 'wincobank_account_natwest', 1347978 ),
+            'trust'   => (string) get_option( 'wincobank_account_trust',   '' ),
+            'chapel'  => (string) get_option( 'wincobank_account_chapel',  '' ),
+            'natwest' => (string) get_option( 'wincobank_account_natwest', '' ),
         ];
     }
 }

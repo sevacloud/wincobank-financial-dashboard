@@ -36,7 +36,7 @@ class Wincobank_QuickFile_Auth {
      * Generate a unique submission number (epoch ms).
      */
     public function make_submission_number(): string {
-        return (string) round( microtime( true ) * 1000 );
+        return wp_generate_uuid4();
     }
 
     public function is_configured(): bool {

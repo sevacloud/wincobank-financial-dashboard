@@ -31,9 +31,9 @@ class Wincobank_Admin_Settings {
             'wincobank_qf_account_number' => 'sanitize_text_field',
             'wincobank_qf_application_id' => 'sanitize_text_field',
             'wincobank_cache_duration'    => 'absint',
-            'wincobank_account_trust'     => 'absint',
-            'wincobank_account_chapel'    => 'absint',
-            'wincobank_account_natwest'   => 'absint',
+            'wincobank_account_trust'     => 'sanitize_text_field',
+            'wincobank_account_chapel'    => 'sanitize_text_field',
+            'wincobank_account_natwest'   => 'sanitize_text_field',
         ];
 
         foreach ( $options as $name => $sanitize ) {
@@ -47,7 +47,7 @@ class Wincobank_Admin_Settings {
 
         add_settings_section( 'wincobank_general', __( 'General', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'wincobank_api', __( 'QuickFile API Credentials', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
-        add_settings_section( 'wincobank_accounts', __( 'Bank Account IDs', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
+        add_settings_section( 'wincobank_accounts', __( 'Bank Account Nominal Codes', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'wincobank_cache', __( 'Cache Settings', 'wincobank-dashboard' ), '__return_false', self::PAGE_SLUG );
 
         $this->add_field( 'wincobank_general', 'wincobank_business_name', __( 'Business Name', 'wincobank-dashboard' ), 'text', __( 'Displayed in the dashboard header and browser tab.', 'wincobank-dashboard' ) );
@@ -57,9 +57,9 @@ class Wincobank_Admin_Settings {
         $this->add_field( 'wincobank_api', 'wincobank_qf_application_id', __( 'Application ID', 'wincobank-dashboard' ), 'text', __( 'The Application ID from QuickFile Settings → API Management.', 'wincobank-dashboard' ) );
         $this->add_field( 'wincobank_api', 'wincobank_qf_api_key', __( 'API Key', 'wincobank-dashboard' ), 'password', __( 'Leave blank to keep current key.', 'wincobank-dashboard' ) );
 
-        $this->add_field( 'wincobank_accounts', 'wincobank_account_trust', __( 'Trust Account ID (HSBC)', 'wincobank-dashboard' ), 'number' );
-        $this->add_field( 'wincobank_accounts', 'wincobank_account_chapel', __( 'Chapel House Account ID (Lloyds)', 'wincobank-dashboard' ), 'number' );
-        $this->add_field( 'wincobank_accounts', 'wincobank_account_natwest', __( 'Chapel Bank Account ID (Natwest)', 'wincobank-dashboard' ), 'number' );
+        $this->add_field( 'wincobank_accounts', 'wincobank_account_trust', __( 'Trust Account Nominal Code (HSBC)', 'wincobank-dashboard' ), 'text', __( 'QuickFile nominal code, e.g. 1200. Find it in Chart of Accounts.', 'wincobank-dashboard' ) );
+        $this->add_field( 'wincobank_accounts', 'wincobank_account_chapel', __( 'Chapel House Nominal Code (Lloyds)', 'wincobank-dashboard' ), 'text', __( 'QuickFile nominal code, e.g. 1201.', 'wincobank-dashboard' ) );
+        $this->add_field( 'wincobank_accounts', 'wincobank_account_natwest', __( 'Chapel Bank Nominal Code (Natwest)', 'wincobank-dashboard' ), 'text', __( 'QuickFile nominal code, e.g. 1202.', 'wincobank-dashboard' ) );
 
         $this->add_field( 'wincobank_cache', 'wincobank_cache_duration', __( 'Cache Duration (seconds)', 'wincobank-dashboard' ), 'number', __( 'Default: 900 (15 minutes).', 'wincobank-dashboard' ) );
     }
