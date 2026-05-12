@@ -75,12 +75,15 @@ class QFD_Dashboard {
         $accounts_raw  = (string) get_option( 'qfd_selected_accounts', '[]' );
         $accounts_list = json_decode( $accounts_raw, true );
 
+        $fy_years = $this->fy_years();
+
         wp_localize_script( 'qfd-dashboard', 'qfdData', [
             'restUrl'          => esc_url_raw( rest_url( 'quickfile/v1' ) ),
             'nonce'            => wp_create_nonce( 'wp_rest' ),
             'currentYear'      => (int) date( 'Y' ),
-            'fyStart'          => $this->current_fy_start(),
-            'fyEnd'            => $this->current_fy_end(),
+            'fyStart'          => $fy_years[0]['from'] ?? $this->current_fy_start(),
+            'fyEnd'            => $fy_years[0]['to']   ?? $this->current_fy_end(),
+            'fyYears'          => $fy_years,
             'isAdmin'          => current_user_can( 'manage_options' ),
             'businessName'     => sanitize_text_field( (string) get_option( 'qfd_business_name', '' ) ),
             'selectedAccounts' => is_array( $accounts_list ) ? $accounts_list : [],
@@ -107,15 +110,49 @@ class QFD_Dashboard {
 </html><?php
     }
 
+    private function fy_start_month(): int {
+        return max( 1, min( 12, (int) get_option( 'qfd_fy_start_month', 4 ) ) );
+    }
+
     private function current_fy_start(): string {
-        $year  = (int) date( 'Y' );
-        $month = (int) date( 'n' );
-        return ( $month >= 4 ? $year : $year - 1 ) . '-04-01';
+        $m         = $this->fy_start_month();
+        $now_year  = (int) date( 'Y' );
+        $now_month = (int) date( 'n' );
+        $year      = ( $now_month >= $m ) ? $now_year : $now_year - 1;
+        return sprintf( '%04d-%02d-01', $year, $m );
     }
 
     private function current_fy_end(): string {
-        $year  = (int) date( 'Y' );
-        $month = (int) date( 'n' );
-        return ( $month >= 4 ? $year + 1 : $year ) . '-03-31';
+        $m          = $this->fy_start_month();
+        $now_year   = (int) date( 'Y' );
+        $now_month  = (int) date( 'n' );
+        $start_year = ( $now_month >= $m ) ? $now_year : $now_year - 1;
+        $end_month  = $m === 1 ? 12 : $m - 1;
+        $end_year   = $m === 1 ? $start_year : $start_year + 1;
+        $end_day    = (int) date( 't', mktime( 0, 0, 0, $end_month, 1, $end_year ) );
+        return sprintf( '%04d-%02d-%02d', $end_year, $end_month, $end_day );
+    }
+
+    private function fy_years( int $count = 5 ): array {
+        $m              = $this->fy_start_month();
+        $now_year       = (int) date( 'Y' );
+        $now_month      = (int) date( 'n' );
+        $current_start  = ( $now_month >= $m ) ? $now_year : $now_year - 1;
+        $years          = [];
+
+        for ( $i = 0; $i < $count; $i++ ) {
+            $start_year = $current_start - $i;
+            $from       = sprintf( '%04d-%02d-01', $start_year, $m );
+            $end_month  = $m === 1 ? 12 : $m - 1;
+            $end_year   = $m === 1 ? $start_year : $start_year + 1;
+            $end_day    = (int) date( 't', mktime( 0, 0, 0, $end_month, 1, $end_year ) );
+            $to         = sprintf( '%04d-%02d-%02d', $end_year, $end_month, $end_day );
+            $label      = $start_year === $end_year
+                ? (string) $start_year
+                : $start_year . '/' . substr( (string) $end_year, 2 );
+            $years[]    = compact( 'label', 'from', 'to' );
+        }
+
+        return $years;
     }
 }

@@ -30,7 +30,7 @@ async function apiFetch( path, params = {}, method = 'GET', body = null ) {
 }
 
 export const api = {
-    getBalances:        ()             => apiFetch( '/balances' ),
+    getBalances:        ( from, to )   => apiFetch( '/balances', from && to ? { from, to } : {} ),
     getMonthlySummary:  ( from, to )   => apiFetch( '/monthly-summary', { from, to } ),
     getAnnualStatement: ( from, to )   => apiFetch( '/annual-statement', { from, to } ),
     getProjects:        ( from, to )   => apiFetch( '/projects', { from, to } ),

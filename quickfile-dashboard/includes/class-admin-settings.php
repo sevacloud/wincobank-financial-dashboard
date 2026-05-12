@@ -28,9 +28,10 @@ class QFD_Settings {
     public function register_settings(): void {
         $options = [
             'qfd_business_name'      => 'sanitize_text_field',
-            'qfd_endpoint'        => 'esc_url_raw',
-            'qfd_account_number'  => 'sanitize_text_field',
-            'qfd_application_id'  => 'sanitize_text_field',
+            'qfd_fy_start_month'     => 'absint',
+            'qfd_endpoint'           => 'esc_url_raw',
+            'qfd_account_number'     => 'sanitize_text_field',
+            'qfd_application_id'     => 'sanitize_text_field',
             'qfd_cache_duration'     => 'absint',
             'qfd_selected_accounts'  => [ $this, 'sanitize_selected_accounts' ],
         ];
@@ -50,6 +51,14 @@ class QFD_Settings {
         add_settings_section( 'qfd_cache', __( 'Cache Settings', 'quickfile-dashboard' ), '__return_false', self::PAGE_SLUG );
 
         $this->add_field( 'qfd_general', 'qfd_business_name', __( 'Business Name', 'quickfile-dashboard' ), 'text', __( 'Displayed in the dashboard header and browser tab.', 'quickfile-dashboard' ) );
+
+        add_settings_field(
+            'qfd_fy_start_month',
+            __( 'Financial Year Start Month', 'quickfile-dashboard' ),
+            [ $this, 'render_fy_month_field' ],
+            self::PAGE_SLUG,
+            'qfd_general'
+        );
 
         $this->add_field( 'qfd_api', 'qfd_endpoint', __( 'API Base URL', 'quickfile-dashboard' ), 'url', __( 'Base URL only — the method name is appended automatically. Default: https://api.quickfile.co.uk/1_2/', 'quickfile-dashboard' ) );
         $this->add_field( 'qfd_api', 'qfd_account_number', __( 'QuickFile Account Number', 'quickfile-dashboard' ), 'text' );
@@ -88,6 +97,27 @@ class QFD_Settings {
             $section
         );
     }
+
+    public function render_fy_month_field(): void {
+        $current = max( 1, min( 12, (int) get_option( 'qfd_fy_start_month', 4 ) ) );
+        $months  = [
+            1 => 'January',  2 => 'February', 3 => 'March',    4 => 'April',
+            5 => 'May',      6 => 'June',      7 => 'July',     8 => 'August',
+            9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
+        ];
+        echo '<select name="qfd_fy_start_month" id="qfd_fy_start_month">';
+        foreach ( $months as $num => $name ) {
+            printf(
+                '<option value="%d"%s>%s</option>',
+                $num,
+                selected( $current, $num, false ),
+                esc_html( $name )
+            );
+        }
+        echo '</select>';
+        echo '<p class="description">' . esc_html__( 'First month of your financial year. Default: April.', 'quickfile-dashboard' ) . '</p>';
+    }
+
 
     public function sanitize_api_key( $value ): string {
         $trimmed = trim( (string) $value );
