@@ -1,0 +1,17 @@
+{
+  "name": "quickfile-dashboard",
+  "version": "1.0.0",
+  "description": "QuickFile Dashboard — WordPress Plugin",
+  "private": true,
+  "scripts": {
+    "build": "wp-scripts build assets/src/index.js --output-path=assets/build",
+    "start": "wp-scripts start assets/src/index.js --output-path=assets/build",
+    "lint:js": "wp-scripts lint-js assets/src"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.0"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "^30.0.0"
+  }
+}

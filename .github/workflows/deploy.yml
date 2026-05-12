@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'wincobank-dashboard/**'
+      - 'quickfile-dashboard/**'
       - '.github/workflows/deploy.yml'
 
 jobs:
@@ -25,11 +25,11 @@ jobs:
           node-version: '24'
 
       - name: Install dependencies
-        working-directory: wincobank-dashboard
+        working-directory: quickfile-dashboard
         run: npm install
 
       - name: Build assets
-        working-directory: wincobank-dashboard
+        working-directory: quickfile-dashboard
         run: npm run build
 
       # ── Deploy ───────────────────────────────────────────────────────────────
@@ -42,8 +42,8 @@ jobs:
           port: ${{ secrets.SFTP_PORT }}
           user: ${{ secrets.SFTP_USER }}
           pass: ${{ secrets.SFTP_PASS }}
-          localDir: ./wincobank-dashboard/
-          remoteDir: ${{ secrets.DEPLOY_PATH }}/wincobank-dashboard/
+          localDir: ./quickfile-dashboard/
+          remoteDir: ${{ secrets.DEPLOY_PATH }}/quickfile-dashboard/
           restoreMTime: false
           parallel: 3
           options: >-
