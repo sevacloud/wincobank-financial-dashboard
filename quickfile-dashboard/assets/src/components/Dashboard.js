@@ -79,7 +79,7 @@ export default function Dashboard() {
         const bal     = balances[ key ] ?? {};
         const ytd     = sumYTD( summary?.[ key ] );
         const live    = parseFloat( bal.CurrentBalance ?? bal.Amount ?? bal.Balance ?? 0 );
-        const opening = bal._openingBalance != null ? parseFloat( bal._openingBalance ) : live;
+        const opening = live + ytd.expenditure - ytd.income;
         const net     = live - opening;
         return { key, live, opening, ytd, net, hasErr: !! bal._error, errMsg: bal._error };
     } ) : [];
