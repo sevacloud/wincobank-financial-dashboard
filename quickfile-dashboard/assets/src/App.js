@@ -1,4 +1,4 @@
-import { useState } from '@wordpress/element';
+import { useState, useEffect, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import Nav from './components/Nav';
 import Dashboard from './components/Dashboard';
@@ -30,9 +30,26 @@ function ViewContent( { view } ) {
     }
 }
 
+function viewFromHash() {
+    const h = window.location.hash.slice( 1 );
+    return VIEW_TITLES[ h ] ? h : 'dashboard';
+}
+
 export default function App() {
-    const [ view, setView ]       = useState( 'dashboard' );
+    const [ view, setView ]         = useState( viewFromHash );
     const [ menuOpen, setMenuOpen ] = useState( false );
+
+    // Keep view in sync with browser back/forward and direct URL navigation.
+    useEffect( () => {
+        const onHash = () => setView( viewFromHash() );
+        window.addEventListener( 'hashchange', onHash );
+        return () => window.removeEventListener( 'hashchange', onHash );
+    }, [] );
+
+    const navigate = useCallback( ( v ) => {
+        window.location.hash = v;
+        setView( v );
+    }, [] );
 
     const now = new Date().toLocaleDateString( 'en-GB', {
         day: '2-digit', month: 'long', year: 'numeric',
@@ -42,7 +59,7 @@ export default function App() {
         <div className="wb-layout">
             <Nav
                 activeView={ view }
-                onNavigate={ setView }
+                onNavigate={ navigate }
                 isOpen={ menuOpen }
                 onClose={ () => setMenuOpen( false ) }
             />
