@@ -169,25 +169,13 @@ class QFD_REST {
             return $results;
         }
 
-        $nominal_codes = $this->selected_nominal_codes();
-        $response      = [];
-
+        $response = [];
         foreach ( $results as $key => $envelope ) {
             if ( $envelope['error'] !== null ) {
                 $response[ $key ] = [ '_error' => $envelope['error'] ];
                 continue;
             }
-
-            $data    = (array) $envelope['data'];
-            $nominal = $nominal_codes[ $key ] ?? '';
-
-            if ( $nominal !== '' ) {
-                $opening = $api->compute_opening_balance( $nominal, $from );
-                $data['_openingBalance'] = is_wp_error( $opening ) ? null : $opening;
-            }
-
-            $data['_cached']  = $envelope['cached'];
-            $response[ $key ] = $data;
+            $response[ $key ] = array_merge( (array) $envelope['data'], [ '_cached' => $envelope['cached'] ] );
         }
 
         return new WP_REST_Response( $response );
