@@ -35,7 +35,6 @@ jobs:
       # ── Deploy ───────────────────────────────────────────────────────────────
 
       - name: Deploy via SFTP (lftp mirror)
-        timeout-minutes: 15
         uses: pressidium/lftp-mirror-action@v1
         with:
           host: ${{ secrets.SFTP_HOST }}

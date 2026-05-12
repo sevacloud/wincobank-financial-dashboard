@@ -208,6 +208,7 @@ class QFD_API {
             return $cached;
         }
 
+        // ReturnCount max for Project_TagSearch is 200 (QuickFile API limit).
         $payload = $this->build_payload( 'Project', 'TagSearch', [
             'SearchParameters' => [ 'ReturnCount' => 200 ],
         ] );
@@ -218,8 +219,9 @@ class QFD_API {
             return $raw;
         }
 
+        $root = array_key_first( $raw );
         $tags = $this->normalise_list(
-            $raw['Project_TagSearch_Response']['Tags']['Tag'] ?? [],
+            $raw[ $root ]['Body']['Record'] ?? [],
             'TagID'
         );
 
