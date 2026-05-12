@@ -344,12 +344,14 @@ class QFD_API {
         do {
             $payload = $this->build_payload( 'Invoice', 'Search', [
                 'SearchParameters' => [
-                    'TagName'       => $tag_name,
-                    'IssueDateFrom' => $from,
-                    'IssueDateTo'   => $to,
-                    'InvoiceType'   => 'PURCHASE',
-                    'ReturnCount' => $page_size,
-                    'Offset'      => $offset,
+                    'TagName'        => $tag_name,
+                    'IssueDateFrom'  => $from,
+                    'IssueDateTo'    => $to,
+                    'InvoiceType'    => 'PURCHASE',
+                    'ReturnCount'    => $page_size,
+                    'Offset'         => $offset,
+                    'OrderResultsBy' => 'InvoiceNumber',
+                    'OrderDirection' => 'DESC',
                 ],
             ] );
 
