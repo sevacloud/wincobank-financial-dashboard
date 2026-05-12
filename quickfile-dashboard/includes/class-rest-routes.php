@@ -16,6 +16,7 @@ class QFD_REST {
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_balances' ],
             'permission_callback' => $auth,
+            'args'                => $this->date_range_args_optional(),
         ] );
 
         register_rest_route( self::NAMESPACE, '/monthly-summary', [
@@ -146,26 +147,47 @@ class QFD_REST {
     // Callbacks
     // -----------------------------------------------------------------
 
-    public function get_balances(): WP_REST_Response|WP_Error {
-        $year    = (int) date( 'Y' );
-        $month   = (int) date( 'n' );
-        $fy_from = ( $month >= 4 ? $year : $year - 1 ) . '-04-01';
-        $fy_to   = date( 'Y-m-d' );
+    public function get_balances( WP_REST_Request $req ): WP_REST_Response|WP_Error {
+        $from = $req->get_param( 'from' );
+        $to   = $req->get_param( 'to' );
+
+        if ( ! $from || ! $to ) {
+            $fy_month = max( 1, min( 12, (int) get_option( 'qfd_fy_start_month', 4 ) ) );
+            $now_year  = (int) date( 'Y' );
+            $now_month = (int) date( 'n' );
+            $from = sprintf( '%04d-%02d-01', ( $now_month >= $fy_month ? $now_year : $now_year - 1 ), $fy_month );
+            $to   = date( 'Y-m-d' );
+        }
+
+        $from = sanitize_text_field( $from );
+        $to   = sanitize_text_field( $to );
 
         $api     = new QFD_API();
-        $results = $api->get_account_balances( $fy_from, $fy_to );
+        $results = $api->get_account_balances( $from, $to );
 
         if ( is_wp_error( $results ) ) {
             return $results;
         }
 
-        // Unwrap per-account envelopes. data = MetaData node from Bank_Search,
-        // which contains CurrentBalance, BankName, Currency, etc.
-        $response = [];
+        $nominal_codes = $this->selected_nominal_codes();
+        $response      = [];
+
         foreach ( $results as $key => $envelope ) {
-            $response[ $key ] = $envelope['error'] !== null
-                ? [ '_error' => $envelope['error'] ]
-                : array_merge( (array) $envelope['data'], [ '_cached' => $envelope['cached'] ] );
+            if ( $envelope['error'] !== null ) {
+                $response[ $key ] = [ '_error' => $envelope['error'] ];
+                continue;
+            }
+
+            $data    = (array) $envelope['data'];
+            $nominal = $nominal_codes[ $key ] ?? '';
+
+            if ( $nominal !== '' ) {
+                $opening = $api->compute_opening_balance( $nominal, $from );
+                $data['_openingBalance'] = is_wp_error( $opening ) ? null : $opening;
+            }
+
+            $data['_cached']  = $envelope['cached'];
+            $response[ $key ] = $data;
         }
 
         return new WP_REST_Response( $response );
@@ -399,6 +421,14 @@ class QFD_REST {
             }
         }
         return $codes;
+    }
+
+    private function date_range_args_optional(): array {
+        $date_validate = fn( $v ) => (bool) preg_match( '/^\d{4}-\d{2}-\d{2}$/', $v );
+        return [
+            'from' => [ 'required' => false, 'validate_callback' => $date_validate ],
+            'to'   => [ 'required' => false, 'validate_callback' => $date_validate ],
+        ];
     }
 
     private function date_range_args(): array {

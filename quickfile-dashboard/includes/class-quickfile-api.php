@@ -230,6 +230,85 @@ class QFD_API {
     }
 
     /**
+     * Compute the account balance at the start of a period.
+     *
+     * Fetches all transactions from $from to today via paginated Bank_Search,
+     * then derives: opening = CurrentBalance(live) − net_change_over_period.
+     *
+     * This is stable: new transactions after $from cancel out in both
+     * CurrentBalance and net_change, so the result doesn't drift over time.
+     *
+     * @param  string $nominal_code  Account nominal code.
+     * @param  string $from          Period start date (YYYY-MM-DD).
+     * @return float|WP_Error
+     */
+    public function compute_opening_balance( string $nominal_code, string $from ): float|WP_Error {
+        $guard = $this->credentials_guard();
+        if ( is_wp_error( $guard ) ) {
+            return $guard;
+        }
+
+        $cache_key = self::CACHE_PREFIX . 'open_' . md5( "{$nominal_code}|{$from}" );
+        $cached    = get_transient( $cache_key );
+        if ( $cached !== false ) {
+            return (float) $cached;
+        }
+
+        $today        = date( 'Y-m-d' );
+        $page_size    = 500;
+        $offset       = 0;
+        $live_balance = null;
+        $net_change   = 0.0;
+
+        do {
+            $payload = $this->build_payload( 'Bank', 'Search', [
+                'SearchParameters' => [
+                    'NominalCode'    => $nominal_code,
+                    'FromDate'       => $from,
+                    'ToDate'         => $today,
+                    'ReturnCount'    => $page_size,
+                    'Offset'         => $offset,
+                    'OrderResultsBy' => 'TransactionDate',
+                    'OrderDirection' => 'ASC',
+                ],
+            ] );
+
+            $raw = $this->post( 'Bank', 'Search', $payload );
+            if ( is_wp_error( $raw ) ) {
+                $this->log_error( 'Bank_Search (opening balance)', $nominal_code, $raw );
+                return $raw;
+            }
+
+            $root = array_key_first( $raw );
+
+            if ( $live_balance === null ) {
+                $live_balance = (float) ( $raw[ $root ]['Body']['MetaData']['CurrentBalance'] ?? 0 );
+            }
+
+            $transactions = $this->normalise_list(
+                $raw[ $root ]['Body']['Transactions']['Transaction'] ?? [],
+                'TransactionId'
+            );
+
+            foreach ( $transactions as $txn ) {
+                $amount = (float) ( $txn['Amount'] ?? 0 );
+                $type   = strtoupper( $txn['TransactionType'] ?? '' );
+                if ( $type === 'CREDIT' || ( $type === '' && $amount > 0 ) ) {
+                    $net_change += abs( $amount );
+                } elseif ( $type === 'DEBIT' || ( $type === '' && $amount < 0 ) ) {
+                    $net_change -= abs( $amount );
+                }
+            }
+
+            $offset += count( $transactions );
+        } while ( count( $transactions ) === $page_size );
+
+        $opening = ( $live_balance ?? 0.0 ) - $net_change;
+        set_transient( $cache_key, $opening, $this->cache_ttl );
+        return round( $opening, 2 );
+    }
+
+    /**
      * Invoice_Search (filtered by project tag)
      *
      * Returns all purchase invoices tagged with a given project tag name
@@ -268,7 +347,7 @@ class QFD_API {
                     'TagName'        => $tag_name,
                     'IssueDateFrom'  => $from,
                     'IssueDateTo'    => $to,
-                    'InvoiceType'    => 'INVOICE',
+                    'InvoiceType'    => 'PURCHASE',
                     'ReturnCount'    => $page_size,
                     'Offset'         => $offset,
                     'OrderResultsBy' => 'InvoiceNumber',
