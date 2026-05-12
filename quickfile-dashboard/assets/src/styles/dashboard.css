@@ -90,10 +90,11 @@ body.qfd-body {
 }
 
 .wb-nav__btn--active {
-    background: rgba(255,255,255,.12);
-    color: var(--white);
+    background: var(--bg);
+    color: var(--navy);
     border-left-color: var(--gold);
     font-weight: 600;
+    border-radius: var(--radius) 0 0 var(--radius);
 }
 
 .wb-sidebar__footer {
