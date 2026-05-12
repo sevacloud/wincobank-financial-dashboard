@@ -408,7 +408,7 @@ class QFD_Settings {
                 printf(
                     '<a href="%s" class="button button-primary" style="margin-right:8px;">%s</a>',
                     esc_url( $dashboard_url ),
-                    esc_html__( 'Open Trustee Dashboard', 'quickfile-dashboard' )
+                    esc_html__( 'Open Dashboard', 'quickfile-dashboard' )
                 );
                 printf(
                     '<a href="%s" class="button button-secondary">%s</a>',
