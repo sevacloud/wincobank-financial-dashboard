@@ -113,7 +113,7 @@ class QFD_Login {
     // -----------------------------------------------------------------
 
     private function render_page( string $error = '' ): void {
-        $business = esc_html( (string) get_option( 'qfd_business_name', 'Wincobank' ) );
+        $business = esc_html( (string) get_option( 'qfd_business_name', 'Your Business' ) );
         $nonce    = wp_create_nonce( 'qfd_login' );
         $redirect = esc_attr( $this->safe_redirect_url() );
         ?><!DOCTYPE html>
