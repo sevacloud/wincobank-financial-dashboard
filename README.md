@@ -1,2 +1,2 @@
-# wincobank-financial-dashboard
-Trustee-facing financial dashboard for The Charity of Mary Ann Rawson for Wincobank School
+# quickfile-financial-dashboard
+A trustee-facing financial dashboard for organisations to extend Quickfile reporting capabilities, with a focus on Building Management and Running Community Activities.
