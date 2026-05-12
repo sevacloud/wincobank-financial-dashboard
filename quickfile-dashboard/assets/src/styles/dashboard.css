@@ -94,7 +94,7 @@ body.qfd-body {
     color: var(--navy);
     border-left-color: var(--gold);
     font-weight: 600;
-    border-radius: var(--radius) 0 0 var(--radius);
+    border-radius: 30px 0 0 30px;
 }
 
 .wb-sidebar__footer {
