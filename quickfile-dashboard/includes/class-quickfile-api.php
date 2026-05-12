@@ -268,7 +268,7 @@ class QFD_API {
                     'TagName'       => $tag_name,
                     'IssueDateFrom' => $from,
                     'IssueDateTo'   => $to,
-                    'InvoiceType'   => 'PURCHASE',
+                    'InvoiceType'   => 'INVOICE',
                     'ReturnCount' => $page_size,
                     'Offset'      => $offset,
                 ],
