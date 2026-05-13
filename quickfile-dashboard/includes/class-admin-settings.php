@@ -45,6 +45,11 @@ class QFD_Settings {
             'sanitize_callback' => [ $this, 'sanitize_api_key' ],
         ] );
 
+        // Historical years stored as JSON array.
+        register_setting( self::OPTION_GROUP, 'qfd_historical_years', [
+            'sanitize_callback' => [ $this, 'sanitize_historical_years' ],
+        ] );
+
         add_settings_section( 'qfd_general', __( 'General', 'quickfile-dashboard' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'qfd_api', __( 'QuickFile API Credentials', 'quickfile-dashboard' ), '__return_false', self::PAGE_SLUG );
         add_settings_section( 'qfd_accounts', '', [ $this, 'render_accounts_section_header' ], self::PAGE_SLUG );
@@ -74,6 +79,15 @@ class QFD_Settings {
         );
 
         $this->add_field( 'qfd_cache', 'qfd_cache_duration', __( 'Cache Duration (seconds)', 'quickfile-dashboard' ), 'number', __( 'Default: 900 (15 minutes).', 'quickfile-dashboard' ) );
+
+        add_settings_section( 'qfd_historical', __( 'Historical Financial Years', 'quickfile-dashboard' ), '__return_false', self::PAGE_SLUG );
+        add_settings_field(
+            'qfd_historical_years',
+            __( 'Prior Years', 'quickfile-dashboard' ),
+            [ $this, 'render_historical_years_field' ],
+            self::PAGE_SLUG,
+            'qfd_historical'
+        );
     }
 
     private function add_field( string $section, string $id, string $label, string $type, string $description = '' ): void {
@@ -145,6 +159,201 @@ class QFD_Settings {
                 'bankId'      => (int) ( $item['bankId']      ?? 0 ),
                 'nominalCode' => (int) ( $item['nominalCode'] ?? 0 ),
                 'name'        => sanitize_text_field( $item['name'] ?? '' ),
+            ];
+        }
+        return wp_json_encode( $clean );
+    }
+
+    public function render_historical_years_field(): void {
+        $fy_month    = max( 1, min( 12, (int) get_option( 'qfd_fy_start_month', 4 ) ) );
+        $saved_json  = (string) get_option( 'qfd_historical_years', '[]' );
+        $saved       = json_decode( $saved_json, true );
+        if ( ! is_array( $saved ) ) {
+            $saved = [];
+        }
+        $accounts_json = (string) get_option( 'qfd_selected_accounts', '[]' );
+        $accounts      = json_decode( $accounts_json, true );
+        if ( ! is_array( $accounts ) ) {
+            $accounts = [];
+        }
+        ?>
+        <table id="wb-hist-years-table" style="border-collapse:collapse;width:100%;max-width:900px;">
+            <thead>
+                <tr>
+                    <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #ccd0d4;"><?php esc_html_e( 'Label', 'quickfile-dashboard' ); ?></th>
+                    <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #ccd0d4;"><?php esc_html_e( 'From', 'quickfile-dashboard' ); ?></th>
+                    <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #ccd0d4;"><?php esc_html_e( 'To', 'quickfile-dashboard' ); ?></th>
+                    <?php foreach ( $accounts as $acc ) : ?>
+                        <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #ccd0d4;">
+                            <?php echo esc_html( $acc['name'] ?? '' ); ?><br>
+                            <span style="font-weight:400;font-size:.8em;color:#888;"><?php esc_html_e( 'Journal Ref', 'quickfile-dashboard' ); ?></span>
+                        </th>
+                    <?php endforeach; ?>
+                    <th style="border-bottom:1px solid #ccd0d4;"></th>
+                </tr>
+            </thead>
+            <tbody id="wb-hist-years-tbody">
+                <?php foreach ( $saved as $row ) : ?>
+                    <tr style="border-bottom:1px solid #f0f0f1;">
+                        <td style="padding:4px 8px;">
+                            <input type="text" class="wb-hist-label" value="<?php echo esc_attr( $row['label'] ?? '' ); ?>" style="width:90px;" placeholder="2023/24">
+                        </td>
+                        <td style="padding:4px 8px;">
+                            <input type="date" class="wb-hist-from" value="<?php echo esc_attr( $row['from'] ?? '' ); ?>" style="width:140px;">
+                        </td>
+                        <td style="padding:4px 8px;">
+                            <input type="date" class="wb-hist-to" value="<?php echo esc_attr( $row['to'] ?? '' ); ?>" style="width:140px;">
+                        </td>
+                        <?php foreach ( $accounts as $acc ) : ?>
+                            <td style="padding:4px 8px;">
+                                <input type="text" class="wb-hist-ref"
+                                       data-bank-id="<?php echo esc_attr( (string) ( $acc['bankId'] ?? '' ) ); ?>"
+                                       value="<?php echo esc_attr( $row['refs'][ (string) ( $acc['bankId'] ?? '' ) ] ?? '' ); ?>"
+                                       style="width:200px;" placeholder="API...">
+                            </td>
+                        <?php endforeach; ?>
+                        <td style="padding:4px 8px;">
+                            <button type="button" class="wb-hist-remove button-link" style="color:#d63638;font-size:1.2em;line-height:1;padding:0 4px;" title="<?php esc_attr_e( 'Remove', 'quickfile-dashboard' ); ?>">×</button>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+
+        <template id="wb-hist-year-tpl">
+            <tr style="border-bottom:1px solid #f0f0f1;">
+                <td style="padding:4px 8px;">
+                    <input type="text" class="wb-hist-label" value="" style="width:90px;" placeholder="2023/24">
+                </td>
+                <td style="padding:4px 8px;">
+                    <input type="date" class="wb-hist-from" value="" style="width:140px;">
+                </td>
+                <td style="padding:4px 8px;">
+                    <input type="date" class="wb-hist-to" value="" style="width:140px;">
+                </td>
+                <?php foreach ( $accounts as $acc ) : ?>
+                    <td style="padding:4px 8px;">
+                        <input type="text" class="wb-hist-ref"
+                               data-bank-id="<?php echo esc_attr( (string) ( $acc['bankId'] ?? '' ) ); ?>"
+                               value="" style="width:200px;" placeholder="API...">
+                    </td>
+                <?php endforeach; ?>
+                <td style="padding:4px 8px;">
+                    <button type="button" class="wb-hist-remove button-link" style="color:#d63638;font-size:1.2em;line-height:1;padding:0 4px;" title="<?php esc_attr_e( 'Remove', 'quickfile-dashboard' ); ?>">×</button>
+                </td>
+            </tr>
+        </template>
+
+        <p style="margin-top:8px;">
+            <button type="button" id="wb-hist-add-year" class="button">＋ <?php esc_html_e( 'Add Year', 'quickfile-dashboard' ); ?></button>
+        </p>
+        <p class="description"><?php esc_html_e( 'Add an entry for each prior financial year. Enter the QuickFile year-end journal reference for each bank account. These years will appear in the dashboard period selector.', 'quickfile-dashboard' ); ?></p>
+
+        <input type="hidden" name="qfd_historical_years" id="wb-hist-years-input" value="<?php echo esc_attr( $saved_json ); ?>">
+
+        <script>
+        (function() {
+            var fyMonth  = <?php echo (int) $fy_month; ?>;
+            var tbody    = document.getElementById('wb-hist-years-tbody');
+            var tpl      = document.getElementById('wb-hist-year-tpl');
+            var addBtn   = document.getElementById('wb-hist-add-year');
+            var hiddenIn = document.getElementById('wb-hist-years-input');
+            var form     = document.querySelector('form[action="options.php"]');
+
+            function daysInMonth(y, m) {
+                return new Date(y, m, 0).getDate();
+            }
+
+            function autoFillDates(row) {
+                var labelIn = row.querySelector('.wb-hist-label');
+                var fromIn  = row.querySelector('.wb-hist-from');
+                var toIn    = row.querySelector('.wb-hist-to');
+                if (!labelIn || !fromIn || !toIn) return;
+                var match = labelIn.value.match(/^(\d{4})\/(\d{2})$/);
+                if (!match) return;
+                var startYear = parseInt(match[1], 10);
+                var endYear   = startYear + 1;
+                var endMonth  = fyMonth === 1 ? 12 : fyMonth - 1;
+                var eYear     = fyMonth === 1 ? startYear : endYear;
+                var eDay      = daysInMonth(eYear, endMonth);
+                fromIn.value = startYear + '-' + String(fyMonth).padStart(2,'0') + '-01';
+                toIn.value   = eYear + '-' + String(endMonth).padStart(2,'0') + '-' + String(eDay).padStart(2,'0');
+            }
+
+            function serializeTable() {
+                var rows = tbody.querySelectorAll('tr');
+                var data = [];
+                rows.forEach(function(row) {
+                    var label = (row.querySelector('.wb-hist-label') || {}).value || '';
+                    var from  = (row.querySelector('.wb-hist-from')  || {}).value || '';
+                    var to    = (row.querySelector('.wb-hist-to')    || {}).value || '';
+                    if (!label && !from && !to) return;
+                    var refs = {};
+                    row.querySelectorAll('.wb-hist-ref').forEach(function(inp) {
+                        var bid = inp.getAttribute('data-bank-id');
+                        var val = inp.value.trim();
+                        if (bid && val) refs[bid] = val;
+                    });
+                    data.push({ label: label, from: from, to: to, refs: refs });
+                });
+                hiddenIn.value = JSON.stringify(data);
+            }
+
+            function attachRowListeners(row) {
+                var removeBtn = row.querySelector('.wb-hist-remove');
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', function() {
+                        row.parentNode.removeChild(row);
+                        serializeTable();
+                    });
+                }
+                var labelIn = row.querySelector('.wb-hist-label');
+                if (labelIn) {
+                    labelIn.addEventListener('input', function() { autoFillDates(row); serializeTable(); });
+                }
+                row.querySelectorAll('.wb-hist-from, .wb-hist-to, .wb-hist-ref').forEach(function(inp) {
+                    inp.addEventListener('input', serializeTable);
+                });
+            }
+
+            // Attach listeners to existing rows.
+            tbody.querySelectorAll('tr').forEach(attachRowListeners);
+
+            addBtn.addEventListener('click', function() {
+                var clone = tpl.content.cloneNode(true);
+                var row   = clone.querySelector('tr');
+                attachRowListeners(row);
+                tbody.appendChild(clone);
+            });
+
+            if (form) { form.addEventListener('submit', serializeTable); }
+        })();
+        </script>
+        <?php
+    }
+
+    public function sanitize_historical_years( $value ): string {
+        $list = json_decode( trim( (string) $value ), true );
+        if ( ! is_array( $list ) ) {
+            return '[]';
+        }
+        $clean = [];
+        foreach ( $list as $row ) {
+            if ( empty( $row['label'] ) || empty( $row['from'] ) || empty( $row['to'] ) ) {
+                continue;
+            }
+            $refs = [];
+            foreach ( (array) ( $row['refs'] ?? [] ) as $bank_id => $ref ) {
+                $ref = trim( sanitize_text_field( $ref ) );
+                if ( $ref !== '' ) {
+                    $refs[ (string) absint( $bank_id ) ] = $ref;
+                }
+            }
+            $clean[] = [
+                'label' => sanitize_text_field( $row['label'] ),
+                'from'  => sanitize_text_field( $row['from'] ),
+                'to'    => sanitize_text_field( $row['to'] ),
+                'refs'  => $refs,
             ];
         }
         return wp_json_encode( $clean );

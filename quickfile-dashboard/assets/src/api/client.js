@@ -41,4 +41,5 @@ export const api = {
     saveProjectBudget:    ( tag_id, budget )        => apiFetch( '/project-budgets', {}, 'POST', { tag_id, budget } ),
     getPriorYear:         ( fy )                    => apiFetch( '/prior-year', { fy } ),
     savePriorYearFigure:  ( fy, code, amount )      => apiFetch( '/prior-year', {}, 'POST', { fy, code, amount } ),
+    getClosingBalances:   ( fy )                    => apiFetch( '/closing-balances', { fy } ),
 };
