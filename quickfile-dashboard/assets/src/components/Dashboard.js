@@ -49,9 +49,12 @@ export default function Dashboard() {
     const [ fy, setFY ]           = useState( currentFY );
     const [ balances, setBalances ] = useState( null );
     const [ summary,  setSummary  ] = useState( null );
+    const [ closingBals, setClosingBals ] = useState( null );
     const [ loading,  setLoading  ] = useState( true );
     const [ error,    setError    ] = useState( null );
     const [ drawerKey, setDrawerKey ] = useState( null );
+
+    const isCurrentFY = fy === currentFY;
 
     const openDrawer  = useCallback( ( key ) => setDrawerKey( key ), [] );
     const closeDrawer = useCallback( () => setDrawerKey( null ), [] );
@@ -60,11 +63,13 @@ export default function Dashboard() {
         if ( ! fy ) return;
         setLoading( true );
         setError( null );
+        const fetchClosing = ! isCurrentFY ? api.getClosingBalances( fy.label ) : Promise.resolve( null );
         Promise.all( [
             api.getBalances( fy.from, fy.to ),
             api.getMonthlySummary( fy.from, fy.to ),
+            fetchClosing,
         ] )
-            .then( ( [ b, s ] ) => { setBalances( b ); setSummary( s ); } )
+            .then( ( [ b, s, cb ] ) => { setBalances( b ); setSummary( s ); setClosingBals( cb ); } )
             .catch( ( e ) => setError( e.message ) )
             .finally( () => setLoading( false ) );
     }, [ fy ] );
@@ -73,24 +78,26 @@ export default function Dashboard() {
         return <ErrorMessage message={ __( 'No financial year configured.', 'quickfile-dashboard' ) } />;
     }
 
-    const isCurrentFY = fy === currentFY;
-
     const rows = balances ? ACCOUNT_KEYS.map( ( key ) => {
-        const bal     = balances[ key ] ?? {};
-        const ytd     = sumYTD( summary?.[ key ] );
-        const live    = parseFloat( bal.CurrentBalance ?? bal.Amount ?? bal.Balance ?? 0 );
-        const opening = live + ytd.expenditure - ytd.income;
-        const net     = live - opening;
-        return { key, live, opening, ytd, net, hasErr: !! bal._error, errMsg: bal._error };
+        const bal        = balances[ key ] ?? {};
+        const ytd        = sumYTD( summary?.[ key ] );
+        const cb         = closingBals?.[ key ];
+        const live       = isCurrentFY
+            ? parseFloat( bal.CurrentBalance ?? bal.Amount ?? bal.Balance ?? 0 )
+            : ( cb?.balance ?? null );
+        const opening    = live !== null ? live + ytd.expenditure - ytd.income : null;
+        const net        = live !== null ? live - opening : null;
+        const missingRef = ! isCurrentFY && cb && cb.has_ref === false;
+        return { key, live, opening, ytd, net, hasErr: !! bal._error || !! cb?._error, errMsg: bal._error || cb?._error, missingRef };
     } ) : [];
 
     const totals = rows.reduce(
         ( acc, r ) => ( {
-            opening:     acc.opening     + r.opening,
+            opening:     acc.opening     + ( r.opening ?? 0 ),
             income:      acc.income      + r.ytd.income,
             expenditure: acc.expenditure + r.ytd.expenditure,
-            live:        acc.live        + r.live,
-            net:         acc.net         + r.net,
+            live:        acc.live        + ( r.live ?? 0 ),
+            net:         acc.net         + ( r.net ?? 0 ),
         } ),
         { opening: 0, income: 0, expenditure: 0, live: 0, net: 0 }
     );
@@ -100,6 +107,8 @@ export default function Dashboard() {
         const errs = [];
         if ( balances?.[ key ]?._error ) errs.push( { label, message: balances[ key ]._error } );
         if ( summary?.[ key ]?._error )  errs.push( { label, message: summary[ key ]._error } );
+        if ( rows.find( ( r ) => r.key === key )?.missingRef )
+            errs.push( { label, message: __( 'Year-end journal reference not set — add it in Settings.', 'quickfile-dashboard' ) } );
         return errs;
     } );
 
@@ -162,9 +171,9 @@ export default function Dashboard() {
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="wb-balance-card__amount">{ fmt( r.live ) }</div>
+                                        <div className="wb-balance-card__amount">{ r.live !== null ? fmt( r.live ) : '–' }</div>
                                         <div className="wb-balance-card__sub">
-                                            { __( 'Opening: ', 'quickfile-dashboard' ) }{ fmt( r.opening ) }
+                                            { __( 'Opening: ', 'quickfile-dashboard' ) }{ r.opening !== null ? fmt( r.opening ) : '–' }
                                         </div>
                                         <div style={ { marginTop: 8 } }>
                                             <RagBadge net={ r.net } />
@@ -191,7 +200,7 @@ export default function Dashboard() {
                                         <th>{ __( 'YTD Income',      'quickfile-dashboard' ) }</th>
                                         <th>{ __( 'YTD Spend',       'quickfile-dashboard' ) }</th>
                                         <th>{ __( 'Net Movement',    'quickfile-dashboard' ) }</th>
-                                        <th>{ __( 'Live Balance',    'quickfile-dashboard' ) }</th>
+                                        <th>{ isCurrentFY ? __( 'Live Balance', 'quickfile-dashboard' ) : __( 'Closing Balance', 'quickfile-dashboard' ) }</th>
                                         <th>{ __( 'Status',          'quickfile-dashboard' ) }</th>
                                     </tr>
                                 </thead>
@@ -205,14 +214,14 @@ export default function Dashboard() {
                                                 </td>
                                             ) : (
                                                 <>
-                                                    <td>{ fmt( r.opening ) }</td>
+                                                    <td>{ r.opening !== null ? fmt( r.opening ) : '–' }</td>
                                                     <td style={ { color: 'var(--rag-green)' } }>{ fmt( r.ytd.income ) }</td>
                                                     <td style={ { color: 'var(--rag-red)' } }>{ fmt( r.ytd.expenditure ) }</td>
-                                                    <td style={ { fontWeight: 600, color: r.net >= 0 ? 'var(--rag-green)' : 'var(--rag-red)' } }>
-                                                        { signed( r.net ) }
+                                                    <td style={ { fontWeight: 600, color: r.net !== null && r.net >= 0 ? 'var(--rag-green)' : 'var(--rag-red)' } }>
+                                                        { r.net !== null ? signed( r.net ) : '–' }
                                                     </td>
-                                                    <td style={ { fontWeight: 700, color: 'var(--navy)' } }>{ fmt( r.live ) }</td>
-                                                    <td><RagBadge net={ r.net } /></td>
+                                                    <td style={ { fontWeight: 700, color: 'var(--navy)' } }>{ r.live !== null ? fmt( r.live ) : '–' }</td>
+                                                    <td>{ r.net !== null ? <RagBadge net={ r.net } /> : null }</td>
                                                 </>
                                             ) }
                                         </tr>

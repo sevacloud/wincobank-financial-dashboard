@@ -133,26 +133,35 @@ class QFD_Dashboard {
         return sprintf( '%04d-%02d-%02d', $end_year, $end_month, $end_day );
     }
 
-    private function fy_years( int $count = 5 ): array {
-        $m              = $this->fy_start_month();
-        $now_year       = (int) date( 'Y' );
-        $now_month      = (int) date( 'n' );
-        $current_start  = ( $now_month >= $m ) ? $now_year : $now_year - 1;
-        $years          = [];
+    private function fy_years(): array {
+        $m         = $this->fy_start_month();
+        $now_year  = (int) date( 'Y' );
+        $now_month = (int) date( 'n' );
+        $start     = ( $now_month >= $m ) ? $now_year : $now_year - 1;
+        $end_month = $m === 1 ? 12 : $m - 1;
+        $end_year  = $m === 1 ? $start : $start + 1;
+        $end_day   = (int) date( 't', mktime( 0, 0, 0, $end_month, 1, $end_year ) );
+        $label     = $start === $end_year ? (string) $start : $start . '/' . substr( (string) $end_year, 2 );
+        $current   = [
+            'label' => $label,
+            'from'  => sprintf( '%04d-%02d-01', $start, $m ),
+            'to'    => sprintf( '%04d-%02d-%02d', $end_year, $end_month, $end_day ),
+        ];
 
-        for ( $i = 0; $i < $count; $i++ ) {
-            $start_year = $current_start - $i;
-            $from       = sprintf( '%04d-%02d-01', $start_year, $m );
-            $end_month  = $m === 1 ? 12 : $m - 1;
-            $end_year   = $m === 1 ? $start_year : $start_year + 1;
-            $end_day    = (int) date( 't', mktime( 0, 0, 0, $end_month, 1, $end_year ) );
-            $to         = sprintf( '%04d-%02d-%02d', $end_year, $end_month, $end_day );
-            $label      = $start_year === $end_year
-                ? (string) $start_year
-                : $start_year . '/' . substr( (string) $end_year, 2 );
-            $years[]    = compact( 'label', 'from', 'to' );
+        $hist_raw = (string) get_option( 'qfd_historical_years', '[]' );
+        $hist     = json_decode( $hist_raw, true );
+        $years    = [ $current ];
+        if ( is_array( $hist ) ) {
+            foreach ( $hist as $row ) {
+                if ( ! empty( $row['label'] ) && ! empty( $row['from'] ) && ! empty( $row['to'] ) ) {
+                    $years[] = [
+                        'label' => $row['label'],
+                        'from'  => $row['from'],
+                        'to'    => $row['to'],
+                    ];
+                }
+            }
         }
-
         return $years;
     }
 }

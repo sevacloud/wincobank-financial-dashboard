@@ -141,6 +141,18 @@ class QFD_REST {
             'callback'            => [ $this, 'flush_cache' ],
             'permission_callback' => fn() => current_user_can( 'manage_options' ),
         ] );
+
+        register_rest_route( self::NAMESPACE, '/closing-balances', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'get_closing_balances' ],
+            'permission_callback' => $auth,
+            'args'                => [
+                'fy' => [
+                    'required'          => true,
+                    'sanitize_callback' => 'sanitize_text_field',
+                ],
+            ],
+        ] );
     }
 
     // -----------------------------------------------------------------
@@ -366,6 +378,50 @@ class QFD_REST {
             $timeout
         ) );
         return new WP_REST_Response( [ 'flushed' => true ] );
+    }
+
+    public function get_closing_balances( WP_REST_Request $req ): WP_REST_Response|WP_Error {
+        $fy_label = $req->get_param( 'fy' );
+        $hist_raw = (string) get_option( 'qfd_historical_years', '[]' );
+        $hist     = json_decode( $hist_raw, true );
+        $year     = null;
+        foreach ( (array) $hist as $row ) {
+            if ( ( $row['label'] ?? '' ) === $fy_label ) {
+                $year = $row;
+                break;
+            }
+        }
+        if ( ! $year ) {
+            return new WP_Error( 'not_found', 'Historical year not configured.', [ 'status' => 404 ] );
+        }
+
+        $api      = new QFD_API();
+        $accounts = $this->selected_nominal_codes();
+        $result   = [];
+
+        foreach ( $accounts as $bank_id => $nominal ) {
+            $ref = $year['refs'][ (string) $bank_id ] ?? '';
+            if ( $ref === '' ) {
+                $result[ (string) $bank_id ] = [ 'has_ref' => false ];
+                continue;
+            }
+            $journal = $api->get_journal( $ref );
+            if ( is_wp_error( $journal ) ) {
+                $result[ (string) $bank_id ] = [ 'has_ref' => true, '_error' => $journal->get_error_message() ];
+                continue;
+            }
+            $line    = $journal['lines'][ (string) $nominal ] ?? null;
+            $balance = $line !== null
+                ? floatval( $line['Amount']['ItemDebitAmount'] ?? 0 ) - floatval( $line['Amount']['ItemCreditAmount'] ?? 0 )
+                : null;
+            $result[ (string) $bank_id ] = [
+                'has_ref'      => true,
+                'balance'      => $balance,
+                'journal_date' => $journal['date'],
+            ];
+        }
+
+        return new WP_REST_Response( $result );
     }
 
     // -----------------------------------------------------------------

@@ -380,6 +380,40 @@ class QFD_API {
         return $all_invoices;
     }
 
+    public function get_journal( string $reference ): array|WP_Error {
+        $guard = $this->credentials_guard();
+        if ( is_wp_error( $guard ) ) {
+            return $guard;
+        }
+
+        $cache_key = self::CACHE_PREFIX . 'journal_' . md5( $reference );
+        $cached    = get_transient( $cache_key );
+        if ( $cached !== false ) {
+            return $cached;
+        }
+
+        $payload = $this->build_payload( 'Journal', 'Get', [
+            'JournalReference' => $reference,
+        ] );
+
+        $raw = $this->post( 'Journal', 'Get', $payload );
+        if ( is_wp_error( $raw ) ) {
+            $this->log_error( 'Journal_Get', $reference, $raw );
+            return $raw;
+        }
+
+        $root  = array_key_first( $raw );
+        $lines = $this->normalise_list(
+            $raw[ $root ]['Body']['JournalDetails']['JournalLine'] ?? [],
+            'NominalCode'
+        );
+        $date  = $raw[ $root ]['Body']['JournalDetails']['JournalDate'] ?? '';
+
+        $result = [ 'date' => $date, 'lines' => $lines ];
+        set_transient( $cache_key, $result, $this->cache_ttl );
+        return $result;
+    }
+
     // =========================================================================
     // Request builder
     // =========================================================================
