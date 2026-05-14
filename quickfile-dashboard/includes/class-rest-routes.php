@@ -153,6 +153,19 @@ class QFD_REST {
                 ],
             ],
         ] );
+
+        register_rest_route( self::NAMESPACE, '/balance-sheet', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'get_balance_sheet' ],
+            'permission_callback' => $auth,
+            'args'                => [
+                'to' => [
+                    'required'          => true,
+                    'validate_callback' => fn( $v ) => (bool) preg_match( '/^\d{4}-\d{2}-\d{2}$/', $v ),
+                    'sanitize_callback' => 'sanitize_text_field',
+                ],
+            ],
+        ] );
     }
 
     // -----------------------------------------------------------------
@@ -306,18 +319,30 @@ class QFD_REST {
     }
 
     public function get_year_comparison( WP_REST_Request $req ): WP_REST_Response|WP_Error {
-        $years = array_map( 'intval', explode( ',', $req->get_param( 'years' ) ) );
-        $api   = new QFD_API();
+        $years  = array_map( 'intval', explode( ',', $req->get_param( 'years' ) ) );
+        $api    = new QFD_API();
+        $fy_m   = max( 1, min( 12, (int) get_option( 'qfd_fy_start_month', 4 ) ) );
+        $end_m  = $fy_m === 1 ? 12 : $fy_m - 1;
         $result = [];
 
         foreach ( $years as $year ) {
-            $from = "{$year}-04-01";
-            $to   = ( $year + 1 ) . '-03-31';
-            $data = $api->get_chart_of_accounts( $from, $to );
-            if ( is_wp_error( $data ) ) {
-                return $data;
+            $end_year = $fy_m === 1 ? $year : $year + 1;
+            $end_day  = (int) date( 't', mktime( 0, 0, 0, $end_m, 1, $end_year ) );
+            $from     = sprintf( '%04d-%02d-01', $year, $fy_m );
+            $to       = sprintf( '%04d-%02d-%02d', $end_year, $end_m, $end_day );
+
+            $coa = $api->get_chart_of_accounts( $from, $to );
+            if ( is_wp_error( $coa ) ) return $coa;
+
+            $bs               = $api->get_balance_sheet( $to );
+            $account_balances = [];
+            if ( ! is_wp_error( $bs ) ) {
+                foreach ( $this->selected_nominal_codes() as $bank_id => $nominal ) {
+                    $account_balances[ (string) $bank_id ] = $bs[ (string) $nominal ] ?? null;
+                }
             }
-            $result[ $year ] = $data;
+
+            $result[ $year ] = array_merge( $coa, [ '_balances' => $account_balances, '_to' => $to ] );
         }
 
         return new WP_REST_Response( $result );
@@ -382,46 +407,42 @@ class QFD_REST {
 
     public function get_closing_balances( WP_REST_Request $req ): WP_REST_Response|WP_Error {
         $fy_label = $req->get_param( 'fy' );
-        $hist_raw = (string) get_option( 'qfd_historical_years', '[]' );
-        $hist     = json_decode( $hist_raw, true );
+        $hist     = json_decode( (string) get_option( 'qfd_historical_years', '[]' ), true );
         $year     = null;
         foreach ( (array) $hist as $row ) {
-            if ( ( $row['label'] ?? '' ) === $fy_label ) {
-                $year = $row;
-                break;
-            }
+            if ( ( $row['label'] ?? '' ) === $fy_label ) { $year = $row; break; }
         }
         if ( ! $year ) {
             return new WP_Error( 'not_found', 'Historical year not configured.', [ 'status' => 404 ] );
         }
 
-        $api      = new QFD_API();
-        $accounts = $this->selected_nominal_codes();
-        $result   = [];
+        $api = new QFD_API();
+        $bs  = $api->get_balance_sheet( $year['to'] );
+        if ( is_wp_error( $bs ) ) return $bs;
 
-        foreach ( $accounts as $bank_id => $nominal ) {
-            $ref = $year['refs'][ (string) $bank_id ] ?? '';
-            if ( $ref === '' ) {
-                $result[ (string) $bank_id ] = [ 'has_ref' => false ];
-                continue;
-            }
-            $journal = $api->get_journal( $ref );
-            if ( is_wp_error( $journal ) ) {
-                $result[ (string) $bank_id ] = [ 'has_ref' => true, '_error' => $journal->get_error_message() ];
-                continue;
-            }
-            $line    = $journal['lines'][ (string) $nominal ] ?? null;
-            $balance = $line !== null
-                ? floatval( $line['Amount']['ItemDebitAmount'] ?? 0 ) - floatval( $line['Amount']['ItemCreditAmount'] ?? 0 )
-                : null;
+        $result = [];
+        foreach ( $this->selected_nominal_codes() as $bank_id => $nominal ) {
             $result[ (string) $bank_id ] = [
-                'has_ref'      => true,
-                'balance'      => $balance,
-                'journal_date' => $journal['date'],
+                'balance' => $bs[ (string) $nominal ] ?? null,
+                'as_of'   => $year['to'],
             ];
         }
-
         return new WP_REST_Response( $result );
+    }
+
+    public function get_balance_sheet( WP_REST_Request $req ): WP_REST_Response|WP_Error {
+        $to  = $req->get_param( 'to' );
+        $api = new QFD_API();
+        $bs  = $api->get_balance_sheet( $to );
+        if ( is_wp_error( $bs ) ) return $bs;
+
+        $accounts = [];
+        foreach ( $this->selected_nominal_codes() as $bank_id => $nominal ) {
+            $accounts[ (string) $bank_id ] = [
+                'balance' => $bs[ (string) $nominal ] ?? null,
+            ];
+        }
+        return new WP_REST_Response( [ 'accounts' => $accounts, 'raw' => $bs ] );
     }
 
     // -----------------------------------------------------------------

@@ -4,7 +4,7 @@ import { api } from '../api/client';
 import DateRangeControl from './DateRangeControl';
 import { LoadingSpinner, ErrorMessage } from './LoadingSpinner';
 
-const { fyStart, fyEnd, isAdmin } = window.qfdData || {};
+const { fyStart, fyEnd, isAdmin, selectedAccounts = [] } = window.qfdData || {};
 
 function fyLabel( startYear ) {
     return `${ startYear }/${ String( startYear + 1 ).slice( -2 ) }`;
@@ -269,14 +269,66 @@ function SoFATable( { data, priorYear, priorFY, currentFYLabel, priorFYLabel, on
     );
 }
 
+// ─── Bank account balances at year end ───────────────────────────────────────
+
+function BalanceSheetSummary( { balanceSheet, asOf } ) {
+    if ( ! balanceSheet?.accounts ) return null;
+    const total = selectedAccounts.reduce( ( s, acc ) => {
+        const b = balanceSheet.accounts[ String( acc.bankId ) ]?.balance;
+        return s + ( b ?? 0 );
+    }, 0 );
+    return (
+        <div className="wb-card" style={ { marginTop: 20 } }>
+            <h3 className="wb-card__title">
+                { __( 'Bank Account Balances at Year End', 'quickfile-dashboard' ) }
+                <span style={ { fontWeight: 400, fontSize: '.875rem', color: 'var(--muted)', marginLeft: 12 } }>
+                    { asOf }
+                </span>
+            </h3>
+            <div className="wb-table-wrap">
+                <table className="wb-table">
+                    <thead>
+                        <tr>
+                            <th>{ __( 'Account', 'quickfile-dashboard' ) }</th>
+                            <th style={ { textAlign: 'right' } }>{ __( 'Balance', 'quickfile-dashboard' ) }</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        { selectedAccounts.map( ( acc ) => {
+                            const row = balanceSheet.accounts[ String( acc.bankId ) ];
+                            return (
+                                <tr key={ acc.bankId }>
+                                    <td>{ acc.name }</td>
+                                    <td style={ { textAlign: 'right' } }>
+                                        { row?.balance != null
+                                            ? fmt( row.balance )
+                                            : <span style={ { color: 'var(--muted)' } }>—</span> }
+                                    </td>
+                                </tr>
+                            );
+                        } ) }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td style={ { fontWeight: 700 } }>{ __( 'Total', 'quickfile-dashboard' ) }</td>
+                            <td style={ { fontWeight: 700, textAlign: 'right' } }>{ fmt( total ) }</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AnnualStatement() {
-    const [ data,      setData      ] = useState( null );
-    const [ priorYear, setPriorYear ] = useState( {} );
-    const [ loading,   setLoading   ] = useState( false );
-    const [ error,     setError     ] = useState( null );
-    const [ params,    setParams    ] = useState( { from: fyStart, to: fyEnd } );
+    const [ data,         setData         ] = useState( null );
+    const [ priorYear,    setPriorYear    ] = useState( {} );
+    const [ balanceSheet, setBalanceSheet ] = useState( null );
+    const [ loading,      setLoading      ] = useState( false );
+    const [ error,        setError        ] = useState( null );
+    const [ params,       setParams       ] = useState( { from: fyStart, to: fyEnd } );
 
     const currentFY = parseFYStart( params.from );
     const priorFY   = currentFY - 1;
@@ -288,8 +340,13 @@ export default function AnnualStatement() {
         Promise.all( [
             api.getAnnualStatement( from, to ),
             api.getPriorYear( parseFYStart( from ) - 1 ),
+            api.getBalanceSheet( to ),
         ] )
-            .then( ( [ stmt, py ] ) => { setData( stmt ); setPriorYear( py ); } )
+            .then( ( [ stmt, py, bs ] ) => {
+                setData( stmt );
+                setPriorYear( py );
+                setBalanceSheet( bs );
+            } )
             .catch( ( e ) => setError( e.message ) )
             .finally( () => setLoading( false ) );
     };
@@ -314,22 +371,25 @@ export default function AnnualStatement() {
             { loading && <LoadingSpinner /> }
 
             { ! loading && data && (
-                <div className="wb-card">
-                    <h3 className="wb-card__title">
-                        { __( 'Statement of Financial Activities', 'quickfile-dashboard' ) }
-                        <span style={ { fontWeight: 400, fontSize: '.875rem', color: 'var(--muted)', marginLeft: 12 } }>
-                            { fyLabel( currentFY ) }
-                        </span>
-                    </h3>
-                    <SoFATable
-                        data={ data }
-                        priorYear={ priorYear }
-                        priorFY={ priorFY }
-                        currentFYLabel={ fyLabel( currentFY ) }
-                        priorFYLabel={ fyLabel( priorFY ) }
-                        onPriorYearSaved={ handlePriorYearSaved }
-                    />
-                </div>
+                <>
+                    <div className="wb-card">
+                        <h3 className="wb-card__title">
+                            { __( 'Statement of Financial Activities', 'quickfile-dashboard' ) }
+                            <span style={ { fontWeight: 400, fontSize: '.875rem', color: 'var(--muted)', marginLeft: 12 } }>
+                                { fyLabel( currentFY ) }
+                            </span>
+                        </h3>
+                        <SoFATable
+                            data={ data }
+                            priorYear={ priorYear }
+                            priorFY={ priorFY }
+                            currentFYLabel={ fyLabel( currentFY ) }
+                            priorFYLabel={ fyLabel( priorFY ) }
+                            onPriorYearSaved={ handlePriorYearSaved }
+                        />
+                    </div>
+                    <BalanceSheetSummary balanceSheet={ balanceSheet } asOf={ params.to } />
+                </>
             ) }
 
             { ! loading && ! data && ! error && (

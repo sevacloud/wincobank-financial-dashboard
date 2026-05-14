@@ -3,7 +3,7 @@ import { __ } from '@wordpress/i18n';
 import { api } from '../api/client';
 import { LoadingSpinner, ErrorMessage } from './LoadingSpinner';
 
-const { currentYear } = window.qfdData || {};
+const { currentYear, selectedAccounts = [] } = window.qfdData || {};
 
 function formatCurrency( v ) {
     return new Intl.NumberFormat( 'en-GB', { style: 'currency', currency: 'GBP' } ).format( v ?? 0 );
@@ -94,37 +94,86 @@ export default function YearComparison() {
             { loading && <LoadingSpinner /> }
 
             { ! loading && data && (
-                <div className="wb-card">
-                    <h3 className="wb-card__title">{ __( '3-Year Income & Expenditure Comparison', 'quickfile-dashboard' ) }</h3>
-                    <div className="wb-table-wrap">
-                        <table className="wb-table">
-                            <thead>
-                                <tr>
-                                    <th>{ __( 'Nominal Code / Description', 'quickfile-dashboard' ) }</th>
-                                    { years.map( ( y ) => <th key={ y }>{ fyLabel( y ) }</th> ) }
-                                </tr>
-                            </thead>
-                            <tbody>
-                                { renderSection( __( 'Income', 'quickfile-dashboard' ), sectionRows( 'Income' ) ) }
-                                { renderSection( __( 'Expenditure', 'quickfile-dashboard' ), sectionRows( 'Expenditure' ) ) }
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td>{ __( 'Net Surplus / (Deficit)', 'quickfile-dashboard' ) }</td>
-                                    { years.map( ( y ) => {
-                                        const inc = sectionRows( 'Income'      ).reduce( ( s, c ) => s + getBalance( data[ y ], c ), 0 );
-                                        const exp = sectionRows( 'Expenditure' ).reduce( ( s, c ) => s + getBalance( data[ y ], c ), 0 );
-                                        return (
-                                            <td key={ y } style={ { color: inc - exp >= 0 ? 'var(--rag-green)' : 'var(--rag-red)', fontWeight: 700 } }>
-                                                { formatCurrency( inc - exp ) }
-                                            </td>
-                                        );
-                                    } ) }
-                                </tr>
-                            </tfoot>
-                        </table>
+                <>
+                    <div className="wb-card">
+                        <h3 className="wb-card__title">{ __( '3-Year Income & Expenditure Comparison', 'quickfile-dashboard' ) }</h3>
+                        <div className="wb-table-wrap">
+                            <table className="wb-table">
+                                <thead>
+                                    <tr>
+                                        <th>{ __( 'Nominal Code / Description', 'quickfile-dashboard' ) }</th>
+                                        { years.map( ( y ) => <th key={ y }>{ fyLabel( y ) }</th> ) }
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    { renderSection( __( 'Income', 'quickfile-dashboard' ), sectionRows( 'Income' ) ) }
+                                    { renderSection( __( 'Expenditure', 'quickfile-dashboard' ), sectionRows( 'Expenditure' ) ) }
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td>{ __( 'Net Surplus / (Deficit)', 'quickfile-dashboard' ) }</td>
+                                        { years.map( ( y ) => {
+                                            const inc = sectionRows( 'Income'      ).reduce( ( s, c ) => s + getBalance( data[ y ], c ), 0 );
+                                            const exp = sectionRows( 'Expenditure' ).reduce( ( s, c ) => s + getBalance( data[ y ], c ), 0 );
+                                            return (
+                                                <td key={ y } style={ { color: inc - exp >= 0 ? 'var(--rag-green)' : 'var(--rag-red)', fontWeight: 700 } }>
+                                                    { formatCurrency( inc - exp ) }
+                                                </td>
+                                            );
+                                        } ) }
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
                     </div>
-                </div>
+
+                    { selectedAccounts.length > 0 && (
+                        <div className="wb-card" style={ { marginTop: 20 } }>
+                            <h3 className="wb-card__title">{ __( 'Bank Account Balances at Year End', 'quickfile-dashboard' ) }</h3>
+                            <div className="wb-table-wrap">
+                                <table className="wb-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{ __( 'Account', 'quickfile-dashboard' ) }</th>
+                                            { years.map( ( y ) => <th key={ y } style={ { textAlign: 'right' } }>{ fyLabel( y ) }</th> ) }
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        { selectedAccounts.map( ( acc ) => (
+                                            <tr key={ acc.bankId }>
+                                                <td>{ acc.name }</td>
+                                                { years.map( ( y ) => {
+                                                    const b = data[ y ]?._balances?.[ String( acc.bankId ) ];
+                                                    return (
+                                                        <td key={ y } style={ { textAlign: 'right' } }>
+                                                            { b != null ? formatCurrency( b ) : <span style={ { color: 'var(--muted)' } }>—</span> }
+                                                        </td>
+                                                    );
+                                                } ) }
+                                            </tr>
+                                        ) ) }
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td style={ { fontWeight: 700 } }>{ __( 'Total', 'quickfile-dashboard' ) }</td>
+                                            { years.map( ( y ) => {
+                                                const total = selectedAccounts.reduce( ( s, acc ) => {
+                                                    const b = data[ y ]?._balances?.[ String( acc.bankId ) ];
+                                                    return s + ( b ?? 0 );
+                                                }, 0 );
+                                                return (
+                                                    <td key={ y } style={ { fontWeight: 700, textAlign: 'right' } }>
+                                                        { formatCurrency( total ) }
+                                                    </td>
+                                                );
+                                            } ) }
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    ) }
+                </>
             ) }
             { ! loading && ! data && ! error && (
                 <p className="wb-empty">{ __( 'Select comparison years and click Load Comparison.', 'quickfile-dashboard' ) }</p>

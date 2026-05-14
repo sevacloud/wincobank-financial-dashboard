@@ -165,30 +165,19 @@ class QFD_Settings {
     }
 
     public function render_historical_years_field(): void {
-        $fy_month    = max( 1, min( 12, (int) get_option( 'qfd_fy_start_month', 4 ) ) );
-        $saved_json  = (string) get_option( 'qfd_historical_years', '[]' );
-        $saved       = json_decode( $saved_json, true );
+        $fy_month   = max( 1, min( 12, (int) get_option( 'qfd_fy_start_month', 4 ) ) );
+        $saved_json = (string) get_option( 'qfd_historical_years', '[]' );
+        $saved      = json_decode( $saved_json, true );
         if ( ! is_array( $saved ) ) {
             $saved = [];
         }
-        $accounts_json = (string) get_option( 'qfd_selected_accounts', '[]' );
-        $accounts      = json_decode( $accounts_json, true );
-        if ( ! is_array( $accounts ) ) {
-            $accounts = [];
-        }
         ?>
-        <table id="wb-hist-years-table" style="border-collapse:collapse;width:100%;max-width:900px;">
+        <table id="wb-hist-years-table" style="border-collapse:collapse;width:100%;max-width:600px;">
             <thead>
                 <tr>
                     <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #ccd0d4;"><?php esc_html_e( 'Label', 'quickfile-dashboard' ); ?></th>
                     <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #ccd0d4;"><?php esc_html_e( 'From', 'quickfile-dashboard' ); ?></th>
                     <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #ccd0d4;"><?php esc_html_e( 'To', 'quickfile-dashboard' ); ?></th>
-                    <?php foreach ( $accounts as $acc ) : ?>
-                        <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #ccd0d4;">
-                            <?php echo esc_html( $acc['name'] ?? '' ); ?><br>
-                            <span style="font-weight:400;font-size:.8em;color:#888;"><?php esc_html_e( 'Journal Ref', 'quickfile-dashboard' ); ?></span>
-                        </th>
-                    <?php endforeach; ?>
                     <th style="border-bottom:1px solid #ccd0d4;"></th>
                 </tr>
             </thead>
@@ -204,14 +193,6 @@ class QFD_Settings {
                         <td style="padding:4px 8px;">
                             <input type="date" class="wb-hist-to" value="<?php echo esc_attr( $row['to'] ?? '' ); ?>" style="width:140px;">
                         </td>
-                        <?php foreach ( $accounts as $acc ) : ?>
-                            <td style="padding:4px 8px;">
-                                <input type="text" class="wb-hist-ref"
-                                       data-bank-id="<?php echo esc_attr( (string) ( $acc['bankId'] ?? '' ) ); ?>"
-                                       value="<?php echo esc_attr( $row['refs'][ (string) ( $acc['bankId'] ?? '' ) ] ?? '' ); ?>"
-                                       style="width:200px;" placeholder="API...">
-                            </td>
-                        <?php endforeach; ?>
                         <td style="padding:4px 8px;">
                             <button type="button" class="wb-hist-remove button-link" style="color:#d63638;font-size:1.2em;line-height:1;padding:0 4px;" title="<?php esc_attr_e( 'Remove', 'quickfile-dashboard' ); ?>">×</button>
                         </td>
@@ -231,13 +212,6 @@ class QFD_Settings {
                 <td style="padding:4px 8px;">
                     <input type="date" class="wb-hist-to" value="" style="width:140px;">
                 </td>
-                <?php foreach ( $accounts as $acc ) : ?>
-                    <td style="padding:4px 8px;">
-                        <input type="text" class="wb-hist-ref"
-                               data-bank-id="<?php echo esc_attr( (string) ( $acc['bankId'] ?? '' ) ); ?>"
-                               value="" style="width:200px;" placeholder="API...">
-                    </td>
-                <?php endforeach; ?>
                 <td style="padding:4px 8px;">
                     <button type="button" class="wb-hist-remove button-link" style="color:#d63638;font-size:1.2em;line-height:1;padding:0 4px;" title="<?php esc_attr_e( 'Remove', 'quickfile-dashboard' ); ?>">×</button>
                 </td>
@@ -247,7 +221,7 @@ class QFD_Settings {
         <p style="margin-top:8px;">
             <button type="button" id="wb-hist-add-year" class="button">＋ <?php esc_html_e( 'Add Year', 'quickfile-dashboard' ); ?></button>
         </p>
-        <p class="description"><?php esc_html_e( 'Add an entry for each prior financial year. Enter the QuickFile year-end journal reference for each bank account. These years will appear in the dashboard period selector.', 'quickfile-dashboard' ); ?></p>
+        <p class="description"><?php esc_html_e( 'Add an entry for each prior financial year. These years will appear in the dashboard period selector and closing balances will be retrieved automatically from QuickFile.', 'quickfile-dashboard' ); ?></p>
 
         <input type="hidden" name="qfd_historical_years" id="wb-hist-years-input" value="<?php echo esc_attr( $saved_json ); ?>">
 
@@ -288,13 +262,7 @@ class QFD_Settings {
                     var from  = (row.querySelector('.wb-hist-from')  || {}).value || '';
                     var to    = (row.querySelector('.wb-hist-to')    || {}).value || '';
                     if (!label && !from && !to) return;
-                    var refs = {};
-                    row.querySelectorAll('.wb-hist-ref').forEach(function(inp) {
-                        var bid = inp.getAttribute('data-bank-id');
-                        var val = inp.value.trim();
-                        if (bid && val) refs[bid] = val;
-                    });
-                    data.push({ label: label, from: from, to: to, refs: refs });
+                    data.push({ label: label, from: from, to: to });
                 });
                 hiddenIn.value = JSON.stringify(data);
             }
@@ -311,7 +279,7 @@ class QFD_Settings {
                 if (labelIn) {
                     labelIn.addEventListener('input', function() { autoFillDates(row); serializeTable(); });
                 }
-                row.querySelectorAll('.wb-hist-from, .wb-hist-to, .wb-hist-ref').forEach(function(inp) {
+                row.querySelectorAll('.wb-hist-from, .wb-hist-to').forEach(function(inp) {
                     inp.addEventListener('input', serializeTable);
                 });
             }
@@ -342,18 +310,10 @@ class QFD_Settings {
             if ( empty( $row['label'] ) || empty( $row['from'] ) || empty( $row['to'] ) ) {
                 continue;
             }
-            $refs = [];
-            foreach ( (array) ( $row['refs'] ?? [] ) as $bank_id => $ref ) {
-                $ref = trim( sanitize_text_field( $ref ) );
-                if ( $ref !== '' ) {
-                    $refs[ (string) absint( $bank_id ) ] = $ref;
-                }
-            }
             $clean[] = [
                 'label' => sanitize_text_field( $row['label'] ),
                 'from'  => sanitize_text_field( $row['from'] ),
                 'to'    => sanitize_text_field( $row['to'] ),
-                'refs'  => $refs,
             ];
         }
         return wp_json_encode( $clean );
