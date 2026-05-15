@@ -166,7 +166,7 @@ class QFD_API {
         }
 
         $payload = $this->build_payload( 'Report', 'ChartOfAccounts', [
-            'Parameters' => $params,
+            'SearchParameters' => $params,
         ] );
 
         $raw = $this->post( 'Report', 'ChartOfAccounts', $payload );
@@ -347,6 +347,7 @@ class QFD_API {
                     'TagName'        => $tag_name,
                     'IssueDateFrom'  => $from,
                     'IssueDateTo'    => $to,
+                    'InvoiceType'    => 'INVOICE',
                     'ReturnCount'    => $page_size,
                     'Offset'         => $offset,
                     'OrderResultsBy' => 'InvoiceNumber',
