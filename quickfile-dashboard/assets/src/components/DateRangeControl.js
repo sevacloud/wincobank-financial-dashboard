@@ -3,9 +3,9 @@ import { __ } from '@wordpress/i18n';
 
 const { fyStart, fyEnd } = window.qfdData || {};
 
-export default function DateRangeControl( { onFetch, loading } ) {
-    const [ from, setFrom ] = useState( fyStart || '' );
-    const [ to, setTo ]     = useState( fyEnd   || '' );
+export default function DateRangeControl( { onFetch, loading, defaultFrom, defaultTo } ) {
+    const [ from, setFrom ] = useState( defaultFrom ?? fyStart ?? '' );
+    const [ to,   setTo   ] = useState( defaultTo   ?? fyEnd   ?? '' );
 
     const handleSubmit = ( e ) => {
         e.preventDefault();
