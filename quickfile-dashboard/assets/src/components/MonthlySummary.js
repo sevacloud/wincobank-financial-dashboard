@@ -33,10 +33,10 @@ function monthLabel( ym ) {
     return new Date( +y, +m - 1 ).toLocaleString( 'en-GB', { month: 'short', year: '2-digit' } );
 }
 
-// Collect all months from all accounts; YYYY-MM natural sort = correct Apr–Mar FY order.
-function collectMonths( data ) {
+// Collect all months from the visible accounts; YYYY-MM natural sort = correct Apr–Mar FY order.
+function collectMonths( data, keys ) {
     const s = new Set();
-    ACCOUNT_KEYS.forEach( ( k ) => {
+    keys.forEach( ( k ) => {
         if ( data[ k ] && ! data[ k ]._error ) {
             Object.keys( data[ k ] ).forEach( ( m ) => s.add( m ) );
         }
@@ -52,7 +52,7 @@ function accountRow( data, key, month ) {
 
 // ─── Chart: Income vs Expenditure line chart (combined all accounts) ──────────────────────────
 
-function IncomeExpenditureChart( { months, data } ) {
+function IncomeExpenditureChart( { months, data, keys } ) {
     const canvasRef = useRef( null );
     const chartRef  = useRef( null );
 
@@ -60,7 +60,7 @@ function IncomeExpenditureChart( { months, data } ) {
         if ( ! canvasRef.current ) return;
 
         const combined = months.map( ( m ) =>
-            ACCOUNT_KEYS.reduce(
+            keys.reduce(
                 ( acc, k ) => {
                     const row = accountRow( data, k, m );
                     return { income: acc.income + row.income, expenditure: acc.expenditure + row.expenditure };
@@ -121,12 +121,12 @@ function IncomeExpenditureChart( { months, data } ) {
         } );
 
         return () => chartRef.current?.destroy();
-    }, [ months, data ] );
+    }, [ months, data, keys ] );
 
     return (
         <div className="wb-card">
             <h3 className="wb-card__title">
-                { __( 'Income vs Expenditure — All Accounts', 'quickfile-dashboard' ) }
+                { __( 'Income vs Expenditure', 'quickfile-dashboard' ) }
             </h3>
             <div className="wb-chart-wrap">
                 <canvas
@@ -139,9 +139,9 @@ function IncomeExpenditureChart( { months, data } ) {
     );
 }
 
-// ─── Chart: Clustered bar — monthly net balance per account ─────────────────────────────
+// ─── Chart: Clustered bar — monthly net balance per account ───────────────────────
 
-function AccountBalancesChart( { months, data } ) {
+function AccountBalancesChart( { months, data, keys } ) {
     const canvasRef = useRef( null );
     const chartRef  = useRef( null );
 
@@ -154,7 +154,7 @@ function AccountBalancesChart( { months, data } ) {
                 type: 'bar',
                 data: {
                     labels: months.map( monthLabel ),
-                    datasets: ACCOUNT_KEYS.map( ( k ) => ( {
+                    datasets: keys.map( ( k ) => ( {
                         label: ACCOUNT_LABELS[ k ],
                         data: months.map( ( m ) => {
                             const row = accountRow( data, k, m );
@@ -184,7 +184,7 @@ function AccountBalancesChart( { months, data } ) {
         } );
 
         return () => chartRef.current?.destroy();
-    }, [ months, data ] );
+    }, [ months, data, keys ] );
 
     return (
         <div className="wb-card">
@@ -202,11 +202,12 @@ function AccountBalancesChart( { months, data } ) {
     );
 }
 
-// ─── Data table ───────────────────────────────────────────────────────────────────────────────────
+// ─── Data table ─────────────────────────────────────────────────────────────────────────────────────────────────
 
-function SummaryTable( { months, data } ) {
-    // Pre-compute account and combined totals
-    const acctTotals = ACCOUNT_KEYS.reduce( ( acc, k ) => {
+function SummaryTable( { months, data, keys } ) {
+    const showCombined = keys.length > 1;
+
+    const acctTotals = keys.reduce( ( acc, k ) => {
         let inc = 0, exp = 0;
         if ( data[ k ] && ! data[ k ]._error ) {
             Object.values( data[ k ] ).forEach( ( r ) => {
@@ -218,8 +219,8 @@ function SummaryTable( { months, data } ) {
         return acc;
     }, {} );
 
-    const grandInc = ACCOUNT_KEYS.reduce( ( s, k ) => s + acctTotals[ k ].inc, 0 );
-    const grandExp = ACCOUNT_KEYS.reduce( ( s, k ) => s + acctTotals[ k ].exp, 0 );
+    const grandInc = keys.reduce( ( s, k ) => s + acctTotals[ k ].inc, 0 );
+    const grandExp = keys.reduce( ( s, k ) => s + acctTotals[ k ].exp, 0 );
 
     return (
         <div className="wb-card">
@@ -229,17 +230,19 @@ function SummaryTable( { months, data } ) {
                     <thead>
                         <tr>
                             <th rowSpan={ 2 }>{ __( 'Month', 'quickfile-dashboard' ) }</th>
-                            { ACCOUNT_KEYS.map( ( k ) => (
+                            { keys.map( ( k ) => (
                                 <th key={ k } colSpan={ 2 } style={ { textAlign: 'center' } }>
                                     { ACCOUNT_LABELS[ k ] }
                                 </th>
                             ) ) }
-                            <th colSpan={ 2 } style={ { textAlign: 'center' } }>
-                                { __( 'Combined', 'quickfile-dashboard' ) }
-                            </th>
+                            { showCombined && (
+                                <th colSpan={ 2 } style={ { textAlign: 'center' } }>
+                                    { __( 'Combined', 'quickfile-dashboard' ) }
+                                </th>
+                            ) }
                         </tr>
                         <tr>
-                            { [ ...ACCOUNT_KEYS, 'combined' ].map( ( k ) => (
+                            { [ ...keys, ...( showCombined ? [ 'combined' ] : [] ) ].map( ( k ) => (
                                 <th key={ `${ k }-sub` } colSpan={ 2 } style={ { fontWeight: 400, fontSize: '.75rem', background: 'var(--navy)', opacity: .85 } }>
                                     { __( 'In / Out', 'quickfile-dashboard' ) }
                                 </th>
@@ -249,7 +252,7 @@ function SummaryTable( { months, data } ) {
                     <tbody>
                         { months.map( ( m ) => {
                             let combInc = 0, combExp = 0;
-                            const cells = ACCOUNT_KEYS.map( ( k ) => {
+                            const cells = keys.map( ( k ) => {
                                 const row = accountRow( data, k, m );
                                 combInc += row.income;
                                 combExp += row.expenditure;
@@ -269,12 +272,13 @@ function SummaryTable( { months, data } ) {
                                 <tr key={ m }>
                                     <td>{ monthLabel( m ) }</td>
                                     { cells }
-                                    <td style={ { fontWeight: 600 } }>
-                                        <span style={ { color: 'var(--rag-green)' } }>{ fmt( combInc ) }</span>
-                                        { ' / ' }
-                                        <span style={ { color: 'var(--rag-red)' } }>{ fmt( combExp ) }</span>
-                                    </td>
-                                    { /* colspan filler for second combined column — merged above */ }
+                                    { showCombined && (
+                                        <td style={ { fontWeight: 600 } }>
+                                            <span style={ { color: 'var(--rag-green)' } }>{ fmt( combInc ) }</span>
+                                            { ' / ' }
+                                            <span style={ { color: 'var(--rag-red)' } }>{ fmt( combExp ) }</span>
+                                        </td>
+                                    ) }
                                 </tr>
                             );
                         } ) }
@@ -282,18 +286,20 @@ function SummaryTable( { months, data } ) {
                     <tfoot>
                         <tr>
                             <td>{ __( 'Total', 'quickfile-dashboard' ) }</td>
-                            { ACCOUNT_KEYS.map( ( k ) => (
+                            { keys.map( ( k ) => (
                                 <td key={ k } colSpan={ 2 }>
                                     <span style={ { color: 'var(--rag-green)' } }>{ fmt( acctTotals[ k ].inc ) }</span>
                                     { ' / ' }
                                     <span style={ { color: 'var(--rag-red)' } }>{ fmt( acctTotals[ k ].exp ) }</span>
                                 </td>
                             ) ) }
-                            <td style={ { fontWeight: 700 } }>
-                                <span style={ { color: 'var(--rag-green)' } }>{ fmt( grandInc ) }</span>
-                                { ' / ' }
-                                <span style={ { color: 'var(--rag-red)' } }>{ fmt( grandExp ) }</span>
-                            </td>
+                            { showCombined && (
+                                <td style={ { fontWeight: 700 } }>
+                                    <span style={ { color: 'var(--rag-green)' } }>{ fmt( grandInc ) }</span>
+                                    { ' / ' }
+                                    <span style={ { color: 'var(--rag-red)' } }>{ fmt( grandExp ) }</span>
+                                </td>
+                            ) }
                         </tr>
                     </tfoot>
                 </table>
@@ -302,13 +308,16 @@ function SummaryTable( { months, data } ) {
     );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export default function MonthlySummary() {
     const { globalFY } = useFY();
-    const [ data,    setData    ] = useState( null );
-    const [ loading, setLoading ] = useState( false );
-    const [ error,   setError   ] = useState( null );
+    const [ data,          setData          ] = useState( null );
+    const [ loading,       setLoading       ] = useState( false );
+    const [ error,         setError         ] = useState( null );
+    const [ activeAccount, setActiveAccount ] = useState( null ); // null = all accounts
+
+    const visibleKeys = activeAccount ? [ activeAccount ] : ACCOUNT_KEYS;
 
     const fetchData = ( from, to ) => {
         setLoading( true );
@@ -323,10 +332,10 @@ export default function MonthlySummary() {
         if ( globalFY ) fetchData( globalFY.from, globalFY.to );
     }, [ globalFY ] );
 
-    const months = data ? collectMonths( data ) : [];
+    const months = data ? collectMonths( data, visibleKeys ) : [];
 
     const apiErrors = data
-        ? ACCOUNT_KEYS.flatMap( ( key ) =>
+        ? visibleKeys.flatMap( ( key ) =>
             data[ key ]?._error
                 ? [ { label: ACCOUNT_LABELS[ key ] ?? key, message: data[ key ]._error } ]
                 : []
@@ -342,15 +351,36 @@ export default function MonthlySummary() {
                 defaultFrom={ globalFY?.from }
                 defaultTo={ globalFY?.to }
             />
+
+            { ACCOUNT_KEYS.length > 1 && (
+                <div style={ { display: 'flex', gap: 8, flexWrap: 'wrap', margin: '12px 0' } }>
+                    <button
+                        className={ `wb-pill${ activeAccount === null ? ' wb-pill--active' : '' }` }
+                        onClick={ () => setActiveAccount( null ) }
+                    >
+                        { __( 'All Accounts', 'quickfile-dashboard' ) }
+                    </button>
+                    { ACCOUNT_KEYS.map( ( k ) => (
+                        <button
+                            key={ k }
+                            className={ `wb-pill${ activeAccount === k ? ' wb-pill--active' : '' }` }
+                            onClick={ () => setActiveAccount( k ) }
+                        >
+                            { ACCOUNT_LABELS[ k ] }
+                        </button>
+                    ) ) }
+                </div>
+            ) }
+
             { error && <ErrorMessage message={ error } /> }
             <ApiErrorBanner errors={ apiErrors } />
             { loading && <LoadingSpinner /> }
 
             { ! loading && data && months.length > 0 && (
                 <>
-                    <IncomeExpenditureChart months={ months } data={ data } />
-                    <AccountBalancesChart   months={ months } data={ data } />
-                    <SummaryTable           months={ months } data={ data } />
+                    <IncomeExpenditureChart months={ months } data={ data } keys={ visibleKeys } />
+                    <AccountBalancesChart   months={ months } data={ data } keys={ visibleKeys } />
+                    <SummaryTable           months={ months } data={ data } keys={ visibleKeys } />
                 </>
             ) }
 
