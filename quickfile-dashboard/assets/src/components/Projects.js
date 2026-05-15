@@ -3,8 +3,7 @@ import { __ } from '@wordpress/i18n';
 import { api } from '../api/client';
 import DateRangeControl from './DateRangeControl';
 import { LoadingSpinner, ErrorMessage } from './LoadingSpinner';
-
-const { fyStart, fyEnd } = window.qfdData || {};
+import { useFY } from '../FYContext';
 
 function fmt( v ) {
     return new Intl.NumberFormat( 'en-GB', { style: 'currency', currency: 'GBP' } ).format( v ?? 0 );
@@ -305,6 +304,7 @@ function SummaryBar( { projects, budgets } ) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Projects() {
+    const { globalFY } = useFY();
     const [ projects, setProjects ] = useState( null );
     const [ budgets,  setBudgets  ] = useState( {} );
     const [ loading,  setLoading  ] = useState( false );
@@ -322,7 +322,9 @@ export default function Projects() {
             .finally( () => setLoading( false ) );
     };
 
-    useEffect( () => { fetchData( fyStart, fyEnd ); }, [] );
+    useEffect( () => {
+        if ( globalFY ) fetchData( globalFY.from, globalFY.to );
+    }, [ globalFY ] );
 
     const handleBudgetSaved = useCallback( ( tagId, newBudget ) => {
         setBudgets( ( prev ) => ( { ...prev, [ tagId ]: newBudget } ) );
@@ -330,7 +332,13 @@ export default function Projects() {
 
     return (
         <div>
-            <DateRangeControl onFetch={ fetchData } loading={ loading } />
+            <DateRangeControl
+                key={ globalFY?.label }
+                onFetch={ fetchData }
+                loading={ loading }
+                defaultFrom={ globalFY?.from }
+                defaultTo={ globalFY?.to }
+            />
             { error && <ErrorMessage message={ error } /> }
             { loading && <LoadingSpinner /> }
 

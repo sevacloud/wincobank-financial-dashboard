@@ -3,8 +3,9 @@ import { __ } from '@wordpress/i18n';
 import { api } from '../api/client';
 import DateRangeControl from './DateRangeControl';
 import { LoadingSpinner, ErrorMessage, ApiErrorBanner } from './LoadingSpinner';
+import { useFY } from '../FYContext';
 
-const { fyStart, fyEnd, selectedAccounts = [] } = window.qfdData || {};
+const { selectedAccounts = [] } = window.qfdData || {};
 
 const ACCOUNT_KEYS   = selectedAccounts.map( ( a ) => String( a.bankId ) );
 const ACCOUNT_LABELS = Object.fromEntries( selectedAccounts.map( ( a ) => [ String( a.bankId ), a.name ] ) );
@@ -304,6 +305,7 @@ function SummaryTable( { months, data } ) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MonthlySummary() {
+    const { globalFY } = useFY();
     const [ data,    setData    ] = useState( null );
     const [ loading, setLoading ] = useState( false );
     const [ error,   setError   ] = useState( null );
@@ -317,7 +319,9 @@ export default function MonthlySummary() {
             .finally( () => setLoading( false ) );
     };
 
-    useEffect( () => { fetchData( fyStart, fyEnd ); }, [] );
+    useEffect( () => {
+        if ( globalFY ) fetchData( globalFY.from, globalFY.to );
+    }, [ globalFY ] );
 
     const months = data ? collectMonths( data ) : [];
 
@@ -331,7 +335,13 @@ export default function MonthlySummary() {
 
     return (
         <div>
-            <DateRangeControl onFetch={ fetchData } loading={ loading } />
+            <DateRangeControl
+                key={ globalFY?.label }
+                onFetch={ fetchData }
+                loading={ loading }
+                defaultFrom={ globalFY?.from }
+                defaultTo={ globalFY?.to }
+            />
             { error && <ErrorMessage message={ error } /> }
             <ApiErrorBanner errors={ apiErrors } />
             { loading && <LoadingSpinner /> }

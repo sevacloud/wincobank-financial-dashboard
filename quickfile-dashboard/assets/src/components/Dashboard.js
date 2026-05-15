@@ -3,6 +3,7 @@ import { __ } from '@wordpress/i18n';
 import { api } from '../api/client';
 import { LoadingSpinner, ErrorMessage, ApiErrorBanner } from './LoadingSpinner';
 import TransactionList from './TransactionList';
+import { useFY } from '../FYContext';
 
 const { fyYears = [], selectedAccounts = [] } = window.qfdData || {};
 
@@ -45,8 +46,8 @@ function signed( n ) {
 }
 
 export default function Dashboard() {
-    const currentFY               = fyYears[ 0 ] ?? null;
-    const [ fy, setFY ]           = useState( currentFY );
+    const { globalFY: fy } = useFY();
+    const currentFY = fyYears[ 0 ] ?? null;
     const [ balances, setBalances ] = useState( null );
     const [ summary,  setSummary  ] = useState( null );
     const [ closingBals, setClosingBals ] = useState( null );
@@ -54,7 +55,7 @@ export default function Dashboard() {
     const [ error,    setError    ] = useState( null );
     const [ drawerKey, setDrawerKey ] = useState( null );
 
-    const isCurrentFY = fy === currentFY;
+    const isCurrentFY = fy?.label === currentFY?.label;
 
     const openDrawer  = useCallback( ( key ) => setDrawerKey( key ), [] );
     const closeDrawer = useCallback( () => setDrawerKey( null ), [] );
@@ -114,36 +115,6 @@ export default function Dashboard() {
 
     return (
         <div>
-            {/* ---- Year selector ---- */}
-            <div className="wb-card" style={ { marginBottom: 20, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' } }>
-                <label htmlFor="wb-fy-select" style={ { fontWeight: 600, color: 'var(--navy)', whiteSpace: 'nowrap' } }>
-                    { __( 'Financial Year', 'quickfile-dashboard' ) }
-                </label>
-                <select
-                    id="wb-fy-select"
-                    value={ fy.label }
-                    onChange={ ( e ) => {
-                        const selected = fyYears.find( ( y ) => y.label === e.target.value );
-                        if ( selected ) setFY( selected );
-                    } }
-                    style={ { padding: '6px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: '1rem', color: 'var(--navy)', fontWeight: 600 } }
-                >
-                    { fyYears.map( ( y ) => (
-                        <option key={ y.label } value={ y.label }>
-                            { y.label }{ y === currentFY ? __( ' (current)', 'quickfile-dashboard' ) : '' }
-                        </option>
-                    ) ) }
-                </select>
-                <span style={ { fontSize: '.875rem', color: 'var(--muted)' } }>
-                    { fy.from } { __( 'to', 'quickfile-dashboard' ) } { fy.to }
-                    { isCurrentFY && (
-                        <span style={ { marginLeft: 8, background: 'var(--teal)', color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: '.75rem', fontWeight: 600 } }>
-                            { __( 'Current', 'quickfile-dashboard' ) }
-                        </span>
-                    ) }
-                </span>
-            </div>
-
             { loading && <LoadingSpinner /> }
             { ! loading && error && <ErrorMessage message={ error } /> }
 

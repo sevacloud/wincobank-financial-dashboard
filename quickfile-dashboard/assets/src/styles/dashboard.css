@@ -124,7 +124,40 @@ body.qfd-body {
 
 .wb-topbar__title { font-size: 1.25rem; font-weight: 700; color: var(--navy); }
 
-.wb-topbar__meta { font-size: .8125rem; color: var(--muted); }
+.wb-topbar__meta { font-size: .8125rem; color: var(--muted); white-space: nowrap; }
+
+.wb-topbar__fy {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.wb-topbar__fy-label {
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    white-space: nowrap;
+}
+
+.wb-topbar__fy-select {
+    padding: 5px 8px;
+    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    font-size: .875rem;
+    color: var(--navy);
+    font-weight: 600;
+    font-family: var(--font);
+    background: var(--white);
+    cursor: pointer;
+}
+
+.wb-topbar__fy-select:focus {
+    outline: 2px solid var(--teal);
+    outline-offset: 1px;
+}
 
 .wb-content { padding: 32px; flex: 1; }
 
