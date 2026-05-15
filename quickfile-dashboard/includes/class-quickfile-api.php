@@ -166,7 +166,7 @@ class QFD_API {
         }
 
         $payload = $this->build_payload( 'Report', 'ChartOfAccounts', [
-            'SearchParameters' => $params,
+            'Parameters' => $params,
         ] );
 
         $raw = $this->post( 'Report', 'ChartOfAccounts', $payload );
