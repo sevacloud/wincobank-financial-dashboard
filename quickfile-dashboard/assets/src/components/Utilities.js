@@ -3,8 +3,7 @@ import { __ } from '@wordpress/i18n';
 import { api } from '../api/client';
 import DateRangeControl from './DateRangeControl';
 import { LoadingSpinner, ErrorMessage } from './LoadingSpinner';
-
-const { fyStart, fyEnd } = window.qfdData || {};
+import { useFY } from '../FYContext';
 
 const UTILITY_LABELS = {
     Gas:         __( 'Gas', 'quickfile-dashboard' ),
@@ -82,6 +81,7 @@ function UtilityChart( { data } ) {
 }
 
 export default function Utilities() {
+    const { globalFY } = useFY();
     const [ data,    setData    ] = useState( null );
     const [ loading, setLoading ] = useState( false );
     const [ error,   setError   ] = useState( null );
@@ -95,7 +95,9 @@ export default function Utilities() {
             .finally( () => setLoading( false ) );
     };
 
-    useEffect( () => { fetchData( fyStart, fyEnd ); }, [] );
+    useEffect( () => {
+        if ( globalFY ) fetchData( globalFY.from, globalFY.to );
+    }, [ globalFY ] );
 
     const allMonths = data
         ? [ ...new Set( Object.values( data ).flatMap( ( m ) => Object.keys( m ) ) ) ].sort()
@@ -103,7 +105,13 @@ export default function Utilities() {
 
     return (
         <div>
-            <DateRangeControl onFetch={ fetchData } loading={ loading } />
+            <DateRangeControl
+                key={ globalFY?.label }
+                onFetch={ fetchData }
+                loading={ loading }
+                defaultFrom={ globalFY?.from }
+                defaultTo={ globalFY?.to }
+            />
             { error && <ErrorMessage message={ error } /> }
             { loading && <LoadingSpinner /> }
             { ! loading && data && (

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { api } from '../api/client';
-import DateRangeControl from './DateRangeControl';
 import { LoadingSpinner, ErrorMessage } from './LoadingSpinner';
+import { useFY } from '../FYContext';
 
-const { fyStart, fyEnd, isAdmin, selectedAccounts = [] } = window.qfdData || {};
+const { isAdmin, selectedAccounts = [] } = window.qfdData || {};
 
 function fyLabel( startYear ) {
     return `${ startYear }/${ String( startYear + 1 ).slice( -2 ) }`;
@@ -33,7 +33,7 @@ function acctBalance( acctData, code ) {
     return row ? parseFloat( row.Balance ?? 0 ) : 0;
 }
 
-// ─── Inline prior-year cell (admin editable) ──────────────────────────────────
+// ─── Inline prior-year cell (admin editable) ──────────────────────────────────────────────
 
 function PriorYearCell( { fy, code, value, onSaved } ) {
     const [ editing,  setEditing  ] = useState( false );
@@ -125,7 +125,7 @@ function PriorYearCell( { fy, code, value, onSaved } ) {
     );
 }
 
-// ─── SOFA table ───────────────────────────────────────────────────────────────
+// ─── SOFA table ───────────────────────────────────────────────────────────────────────────────────
 
 function SoFATable( { data, priorYear, priorFY, currentFYLabel, priorFYLabel, onPriorYearSaved } ) {
     const combined  = data.combined?.NominalAccount ?? [];
@@ -269,7 +269,7 @@ function SoFATable( { data, priorYear, priorFY, currentFYLabel, priorFYLabel, on
     );
 }
 
-// ─── Bank account balances at year end ───────────────────────────────────────
+// ─── Bank account balances at year end ───────────────────────────────────────────────
 
 function BalanceSheetSummary( { balanceSheet, asOf } ) {
     if ( ! balanceSheet?.accounts ) return null;
@@ -320,21 +320,20 @@ function BalanceSheetSummary( { balanceSheet, asOf } ) {
     );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────────────────────────────────
 
 export default function AnnualStatement() {
+    const { globalFY } = useFY();
     const [ data,         setData         ] = useState( null );
     const [ priorYear,    setPriorYear    ] = useState( {} );
     const [ balanceSheet, setBalanceSheet ] = useState( null );
     const [ loading,      setLoading      ] = useState( false );
     const [ error,        setError        ] = useState( null );
-    const [ params,       setParams       ] = useState( { from: fyStart, to: fyEnd } );
 
-    const currentFY = parseFYStart( params.from );
+    const currentFY = parseFYStart( globalFY?.from );
     const priorFY   = currentFY - 1;
 
     const fetchData = ( from, to ) => {
-        setParams( { from, to } );
         setLoading( true );
         setError( null );
         Promise.all( [
@@ -351,7 +350,9 @@ export default function AnnualStatement() {
             .finally( () => setLoading( false ) );
     };
 
-    useEffect( () => { fetchData( fyStart, fyEnd ); }, [] );
+    useEffect( () => {
+        if ( globalFY ) fetchData( globalFY.from, globalFY.to );
+    }, [ globalFY ] );
 
     const handlePriorYearSaved = useCallback( ( code, amount ) => {
         setPriorYear( ( prev ) => ( { ...prev, [ code ]: amount } ) );
@@ -359,11 +360,9 @@ export default function AnnualStatement() {
 
     return (
         <div>
-            <DateRangeControl onFetch={ fetchData } loading={ loading } />
-
             <p style={ { fontSize: '.8125rem', color: 'var(--muted)', marginBottom: 16 } }>
                 { __( 'Statement of Financial Activities (Charity SORP).', 'quickfile-dashboard' ) }
-                { ' ' }{ __( 'Period:', 'quickfile-dashboard' ) } { params.from } { __( 'to', 'quickfile-dashboard' ) } { params.to }
+                { ' ' }{ __( 'Period:', 'quickfile-dashboard' ) } { globalFY?.from } { __( 'to', 'quickfile-dashboard' ) } { globalFY?.to }
                 { isAdmin && <em>{ ' — ' }{ __( 'Prior year figures: click any cell to edit.', 'quickfile-dashboard' ) }</em> }
             </p>
 
@@ -388,7 +387,7 @@ export default function AnnualStatement() {
                             onPriorYearSaved={ handlePriorYearSaved }
                         />
                     </div>
-                    <BalanceSheetSummary balanceSheet={ balanceSheet } asOf={ params.to } />
+                    <BalanceSheetSummary balanceSheet={ balanceSheet } asOf={ globalFY?.to } />
                 </>
             ) }
 
