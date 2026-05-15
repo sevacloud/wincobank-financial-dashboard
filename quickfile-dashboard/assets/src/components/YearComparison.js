@@ -1,9 +1,9 @@
-import { useState } from '@wordpress/element';
+import { useState, useEffect } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { api } from '../api/client';
 import { LoadingSpinner, ErrorMessage } from './LoadingSpinner';
 
-const { currentYear, selectedAccounts = [] } = window.qfdData || {};
+const { fyYears = [], selectedAccounts = [] } = window.qfdData || {};
 
 function formatCurrency( v ) {
     return new Intl.NumberFormat( 'en-GB', { style: 'currency', currency: 'GBP' } ).format( v ?? 0 );
@@ -14,21 +14,21 @@ function fyLabel( year ) {
 }
 
 export default function YearComparison() {
-    const cur  = currentYear || new Date().getFullYear();
-    const [ year1, setYear1 ] = useState( cur - 2 );
-    const [ year2, setYear2 ] = useState( cur - 1 );
+    const curFYStart  = fyYears[0] ? parseInt( fyYears[0].from.slice( 0, 4 ), 10 ) : new Date().getFullYear();
+    const compYears   = [ curFYStart - 3, curFYStart - 2, curFYStart - 1 ];
+
     const [ data,    setData    ] = useState( null );
     const [ loading, setLoading ] = useState( false );
     const [ error,   setError   ] = useState( null );
 
-    const fetchData = () => {
+    useEffect( () => {
         setLoading( true );
         setError( null );
-        api.getYearComparison( [ year1, year2, cur ] )
+        api.getYearComparison( compYears )
             .then( setData )
             .catch( ( e ) => setError( e.message ) )
             .finally( () => setLoading( false ) );
-    };
+    }, [] );
 
     const years = data ? Object.keys( data ).map( Number ).sort() : [];
 
@@ -79,17 +79,6 @@ export default function YearComparison() {
 
     return (
         <div>
-            <div className="wb-year-inputs">
-                <label htmlFor="wb-y1">{ __( 'Year 1 (start)', 'quickfile-dashboard' ) }</label>
-                <input id="wb-y1" type="number" min="2000" max={ cur } value={ year1 } onChange={ ( e ) => setYear1( Number( e.target.value ) ) } />
-                <label htmlFor="wb-y2">{ __( 'Year 2 (start)', 'quickfile-dashboard' ) }</label>
-                <input id="wb-y2" type="number" min="2000" max={ cur } value={ year2 } onChange={ ( e ) => setYear2( Number( e.target.value ) ) } />
-                <label>{ __( 'Year 3 (current):', 'quickfile-dashboard' ) } <strong>{ fyLabel( cur ) }</strong> { __( '(auto)', 'quickfile-dashboard' ) }</label>
-                <button className="wb-btn" onClick={ fetchData } disabled={ loading }>
-                    { loading ? __( 'Loading…', 'quickfile-dashboard' ) : __( 'Load Comparison', 'quickfile-dashboard' ) }
-                </button>
-            </div>
-
             { error && <ErrorMessage message={ error } /> }
             { loading && <LoadingSpinner /> }
 
@@ -174,9 +163,6 @@ export default function YearComparison() {
                         </div>
                     ) }
                 </>
-            ) }
-            { ! loading && ! data && ! error && (
-                <p className="wb-empty">{ __( 'Select comparison years and click Load Comparison.', 'quickfile-dashboard' ) }</p>
             ) }
         </div>
     );
