@@ -42,4 +42,5 @@ export const api = {
     getPriorYear:         ( fy )                    => apiFetch( '/prior-year', { fy } ),
     savePriorYearFigure:  ( fy, code, amount )      => apiFetch( '/prior-year', {}, 'POST', { fy, code, amount } ),
     getClosingBalances:   ( fy )                    => apiFetch( '/closing-balances', { fy } ),
+    getBalanceSheet:      ( to )                    => apiFetch( '/balance-sheet', { to } ),
 };

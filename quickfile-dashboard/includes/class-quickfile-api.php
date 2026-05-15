@@ -380,6 +380,41 @@ class QFD_API {
         return $all_invoices;
     }
 
+    public function get_balance_sheet( string $to_date ): array|WP_Error {
+        $guard = $this->credentials_guard();
+        if ( is_wp_error( $guard ) ) return $guard;
+
+        $cache_key = self::CACHE_PREFIX . 'bs_' . md5( $to_date );
+        $cached    = get_transient( $cache_key );
+        if ( $cached !== false ) return $cached;
+
+        $payload = $this->build_payload( 'Report', 'BalanceSheet', [
+            'SearchParameters' => [ 'ToDate' => $to_date ],
+        ] );
+
+        $raw = $this->post( 'Report', 'BalanceSheet', $payload );
+        if ( is_wp_error( $raw ) ) {
+            $this->log_error( 'Report_BalanceSheet', $to_date, $raw );
+            return $raw;
+        }
+
+        $root      = array_key_first( $raw );
+        $breakdown = $raw[ $root ]['Body']['Breakdown'] ?? [];
+        $balances  = [];
+        foreach ( [ 'FixedAssets', 'CurrentAssets', 'CurrentLiabilities', 'LongTermLiabilities', 'CapitalAndReserves' ] as $section ) {
+            $items = $breakdown[ $section ]['Balances']['Balance'] ?? null;
+            if ( ! $items ) continue;
+            if ( isset( $items['NominalCode'] ) ) $items = [ $items ];
+            foreach ( (array) $items as $item ) {
+                $code = (string) ( $item['NominalCode'] ?? '' );
+                if ( $code !== '' ) $balances[ $code ] = round( (float) ( $item['Amount'] ?? 0 ), 2 );
+            }
+        }
+
+        set_transient( $cache_key, $balances, $this->cache_ttl );
+        return $balances;
+    }
+
     public function get_journal( string $reference ): array|WP_Error {
         $guard = $this->credentials_guard();
         if ( is_wp_error( $guard ) ) {
