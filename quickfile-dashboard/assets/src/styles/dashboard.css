@@ -237,13 +237,52 @@ body.qfd-body {
     border-radius: 4px;
     font-size: .875rem;
     font-weight: 600;
+    font-family: var(--font);
+    line-height: 1.4;
+    height: auto;
     cursor: pointer;
     transition: opacity .15s;
+    box-shadow: none;
+    text-shadow: none;
+    -webkit-appearance: none;
+    appearance: none;
+    vertical-align: middle;
 }
 
 .wb-btn:hover { opacity: .88; }
 .wb-btn:disabled { opacity: .5; cursor: not-allowed; }
 .wb-btn--secondary { background: var(--navy); }
+
+/* ----- Account filter pills ----- */
+.wb-pill {
+    padding: 5px 14px;
+    background: var(--navy);
+    color: var(--white);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 20px;
+    font-size: .8125rem;
+    font-weight: 500;
+    font-family: var(--font);
+    line-height: 1.4;
+    height: auto;
+    cursor: pointer;
+    opacity: .7;
+    transition: opacity .15s, background .15s;
+    box-shadow: none;
+    text-shadow: none;
+    -webkit-appearance: none;
+    appearance: none;
+    vertical-align: middle;
+    display: inline-block;
+    text-decoration: none;
+}
+.wb-pill:hover { opacity: 1; box-shadow: none; border-color: rgba(255,255,255,.35); color: var(--white); }
+.wb-pill:focus { outline: 2px solid var(--teal); outline-offset: 2px; box-shadow: none; }
+.wb-pill--active {
+    background: var(--teal);
+    border-color: var(--teal);
+    opacity: 1;
+}
 
 /* ----- States ----- */
 /* ----- Transaction drawer ----- */
@@ -339,11 +378,6 @@ body.qfd-body {
 
 /* ----- Utility section ----- */
 .wb-section-heading { font-size: 1.0625rem; font-weight: 700; color: var(--navy); margin: 28px 0 12px; }
-
-/* ----- 3-year comparison inputs ----- */
-.wb-year-inputs { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
-.wb-year-inputs label { font-size: .875rem; font-weight: 500; }
-.wb-year-inputs input { width: 90px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: .875rem; }
 
 /* ----- Combined total column ----- */
 .wb-col-combined { background: #f0f4fb; font-weight: 600; }
