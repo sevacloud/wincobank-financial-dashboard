@@ -245,6 +245,26 @@ body.qfd-body {
 .wb-btn:disabled { opacity: .5; cursor: not-allowed; }
 .wb-btn--secondary { background: var(--navy); }
 
+/* ----- Account filter pills ----- */
+.wb-pill {
+    padding: 5px 14px;
+    background: var(--navy);
+    color: var(--white);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 20px;
+    font-size: .8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    opacity: .7;
+    transition: opacity .15s, background .15s;
+}
+.wb-pill:hover { opacity: 1; }
+.wb-pill--active {
+    background: var(--teal);
+    border-color: var(--teal);
+    opacity: 1;
+}
+
 /* ----- States ----- */
 /* ----- Transaction drawer ----- */
 .wb-drawer-backdrop {
